@@ -25,7 +25,7 @@ def CUDatILP(data, ratio=0.5):
     overall_fold = 0 
     total_time = 0 
     learn_rule_loops = 0
-
+ 
     begin_preprocess = timer()
     embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data)
     
