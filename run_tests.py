@@ -1,5 +1,5 @@
-from foldrm import *
-from datasets import *
+from src.common.foldrm import *
+from src.common.datasets import *
 from timeit import default_timer as timer
 from datetime import timedelta
 import re
@@ -421,8 +421,8 @@ def fast_check():
 
 def main():
     
+    fast_check()
     compare_times()
-    #fast_check()
 
 if __name__ == '__main__':
     main()
