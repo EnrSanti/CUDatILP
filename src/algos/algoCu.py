@@ -6,6 +6,7 @@ from src.algos.algo import *
 from src.algos.pre_postprocessCu import *
 from src.algos.best_ig_kernelsCu import *
 from src.algos.cover_kernelsCu import *
+from src.common.flatRule import *
 import cupy as cp
 
 #######################################                ##########################################
@@ -114,8 +115,6 @@ def CUDatILP(data, ratio=0.5):
         
         e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
         
-        #print("etp:"+str(e_tp))
-        #print("etp_index:"+str(e_tp_index))
 
         end_covers1 = timer()
         overall_covers1 += end_covers1 - start_covers1
@@ -189,6 +188,28 @@ def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,ind
     size_minus = int(host_counts[1])
     return size_plus,size_minus
 
+def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
+    
+    #SI, TEMPORANEAMENTE SOLO CON 2 BLOCCHI, con più blocchi servono 2 kernel diversi lanciati uno dopo l'altro
+
+    
+    normal_dev  = rule.normal 
+    nodes = np.asarray(rule.nodes, dtype=np.int32)
+    literals = np.asarray(rule.literals, dtype=np.int32)
+    edges = np.asarray(rule.edges, dtype=np.int32)
+
+    nodes_dev = cuda.to_device(nodes)
+    literals_dev = cuda.to_device(literals)
+    edges_dev = cuda.to_device(edges)
+
+    print(rule)
+
+    update_tn_tp[2,32](index_sizes_dev,normal_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+    host_counts = index_sizes_dev.copy_to_host()
+
+    size_plus = int(host_counts[0])
+    size_minus = int(host_counts[1])
+    return size_plus,size_minus
 
 def evaluate_(item, dataset_example, categorical_cols):
 
@@ -434,7 +455,7 @@ def fold_gpu(embedded_data_original, index_e_plus, index_e_minus, categorical_co
     return ret
 
 
-                #fixed size (can be >>) #non fixed size (int arrays) #int  #fixed size array #fixed size array #non fixed size array
+#fixed size (can be >>) #non fixed size (int arrays) #int  #fixed size array #fixed size array #non fixed size array
 
 def split_data_by_item_(embedded_data, l,categorical_cols, original_data_indexes):
     data_pos, data_neg = [], []

@@ -1,6 +1,6 @@
 
 from numba import cuda, float64, int32
-import numba
+import numba    
 from src.algos.algo import *
 
 @cuda.jit
