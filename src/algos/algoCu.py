@@ -101,7 +101,7 @@ def CUDatILP(data, ratio=0.5):
         overall_split += end_split - start_split
 
         start_learn = timer()
-        rule,best_item, coversTime,foldTime,timeTotal,loops = learn_rule_(embedded_data_original,index_e_plus, index_e_minus , categorical_cols,categorical_cols_dev,categorical_mask_dev, fst_unused_num_dev, max_range_cols,embedded_data_original_dev,neg_dev, pos_dev, vals_dev, cats_dev, index_sizes_dev ,[], ratio)
+        items_np,items_dev, rule,best_item, coversTime,foldTime,timeTotal,loops = learn_rule_(embedded_data_original,index_e_plus, index_e_minus , categorical_cols,categorical_cols_dev,categorical_mask_dev, fst_unused_num_dev, max_range_cols,embedded_data_original_dev,neg_dev, pos_dev, vals_dev, cats_dev, index_sizes_dev ,[], ratio)
 
         overall_best_item+=best_item
         overall_covers+=coversTime
@@ -112,26 +112,58 @@ def CUDatILP(data, ratio=0.5):
         overall_learn += end_learn - start_learn
         
         start_covers1 = timer()
-        
-        e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
-        
-
-        end_covers1 = timer()
-        overall_covers1 += end_covers1 - start_covers1
-
-        if len(e_tp_index) == len(index_e_plus):
-            break
-
         start_setop = timer()
-        
-        e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols)]
-        
-        original_data_indexes = e_tp_index + e_tn_index
+        if(len(index_e_plus)+len(index_e_minus)>5000 or True): #true for now, just to check
+
+            e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
+            e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
+            
+            print("first el in flat: ", items_np)
+            print(rule)
+            print("before index_e+: ", index_e_plus)
+            
+            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
+            
+            print("after e_tp_index: ", e_tp_index)
+
+            flatRule = FlatState.from_root(rule)
+            flatRule.normal=items_dev
+            n_valid_tp,n_valid_tn=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,e_tp_index_dev,e_tn_index_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
+            
+            print("valid tp:",n_valid_tp)
+
+            # 2. Taglia l'array direttamente sulla GPU (lo slicing in Numba non copia dati)
+            # e POI copia solo la parte utile sull'host
+            if(n_valid_tp>0):
+                e_tp_index = e_tp_index_dev[:n_valid_tp].copy_to_host().tolist()
+            else:
+                e_tp_index=[]
+            if(n_valid_tn>0):
+                e_tn_index = e_tn_index_dev[:n_valid_tn].copy_to_host().tolist()
+            else:
+                e_tn_index=[]
+
+            print("after GPU e_tp_index: ", e_tp_index)
+            original_data_indexes = e_tp_index + e_tn_index
+
+        else:
+            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
+
+            end_covers1 = timer()
+            overall_covers1 += end_covers1 - start_covers1
+
+            if len(e_tp_index) == len(index_e_plus):
+                break
+            e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols)]
+            original_data_indexes = e_tp_index + e_tn_index
 
         #print("----------\n")
         #print("remaining original data indexes "+str(original_data_indexes))
         #print("remaining embedded_data "+str(embedded_data))
-
+        
+        
+        return
+        
         end_setop = timer()
 
         overall_setop += end_setop - start_setop
@@ -176,7 +208,7 @@ def CUDatILP(data, ratio=0.5):
 
 def cover_(rule, embedded_data_original, i,categorical_cols):
     example_x=embedded_data_original[i]
-    return evaluate_(rule, example_x, categorical_cols)
+    return evaluate_(rule, example_x, categorical_cols,1)
 
 def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
     
@@ -211,15 +243,19 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
     size_minus = int(host_counts[1])
     return size_plus,size_minus
 
-def evaluate_(item, dataset_example, categorical_cols):
-
+def evaluate_(item, dataset_example, categorical_cols,flag):
+    print("eval rule ", item)
     if len(item) == 0:
+        if(flag==1):
+            print("len(item) == 0 returning 0", item)
         return 0  # automatically false
 
     # -------------------------
     # Simple literal case
     # -------------------------
     if len(item) == 3:
+        if(flag==1):
+            print("len(item) == 3", item)
         i, r, v = item
         val = dataset_example[i]
 
@@ -246,6 +282,8 @@ def evaluate_(item, dataset_example, categorical_cols):
 
     # If flag == 0 → conjunction must hold
     if item[3] == 0 and len(item[1]) > 0:
+        if(flag==1):
+            print("item[3] == 0 and len(item[1]) > 0", item)
         for sub in item[1]:
             if len(sub) == 3:
                 i, r, v = sub
@@ -272,11 +310,16 @@ def evaluate_(item, dataset_example, categorical_cols):
                     return 0
 
             else:
-                if not evaluate_(sub, dataset_example, categorical_cols):
+                if(flag==1):
+                    print("recursive sub", sub)
+                if not evaluate_(sub, dataset_example, categorical_cols,flag):
                     return 0
+                
 
     # Negative literals (any must NOT hold)
     if len(item[2]) > 0:
+        if(flag==1):
+            print("len(item[2]) > 0", item)
         for sub in item[2]:
             if len(sub) == 3:
                 i, r, v = sub
@@ -303,7 +346,9 @@ def evaluate_(item, dataset_example, categorical_cols):
                     return 0
 
             else:
-                if evaluate_(sub, dataset_example, categorical_cols):
+                if(flag==1):
+                    print("recursive sub", sub)
+                if evaluate_(sub, dataset_example, categorical_cols,flag):
                     return 0
     return 1
 
@@ -343,7 +388,7 @@ def learn_rule_(embedded_data_original,  index_e_plus,       index_e_minus,     
 
         
 
-        if(len(index_e_plus)+len(index_e_minus)>5000):
+        if(len(index_e_plus)+len(index_e_minus)>5000 or True): #remove
             n_valid_plus,n_valid_minus=cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
             
 
@@ -382,7 +427,7 @@ def learn_rule_(embedded_data_original,  index_e_plus,       index_e_minus,     
 
     # Total time for profiling
     total_time = overall_best_item + overall_covers + overall_fold
-    return rule, overall_best_item, overall_covers,overall_fold,total_time,learn_rule_loops
+    return items_np,items_dev, rule, overall_best_item, overall_covers,overall_fold,total_time,learn_rule_loops
 
 def best_item_gpu(index_e_plus_dev,index_e_minus_dev,embedded_data_original,index_e_plus, index_e_minus,categorical_mask_dev, fst_unused_num_dev,max_range_cols, embedded_data_original_dev, pos_dev,neg_dev, vals_dev,cats_dev , used_items=[]):
 
@@ -446,7 +491,7 @@ def best_item_gpu(index_e_plus_dev,index_e_minus_dev,embedded_data_original,inde
 def fold_gpu(embedded_data_original, index_e_plus, index_e_minus, categorical_cols,categorical_cols_dev,categorical_mask,placeholder_nums_dev, max_range_cols,embedded_data_original_dev,neg_dev, pos_dev, vals_dev, cats_dev ,index_sizes_dev,used_items=[], ratio=0.5):
     ret = []
     while len(index_e_plus) > 0:
-        rule,_,_,_,_,_ = learn_rule_(embedded_data_original,index_e_plus, index_e_minus, categorical_cols,categorical_cols_dev, categorical_mask,placeholder_nums_dev,max_range_cols,embedded_data_original_dev,neg_dev, pos_dev, vals_dev, cats_dev ,index_sizes_dev,used_items, ratio)
+        _,_,rule,_,_,_,_,_ = learn_rule_(embedded_data_original,index_e_plus, index_e_minus, categorical_cols,categorical_cols_dev, categorical_mask,placeholder_nums_dev,max_range_cols,embedded_data_original_dev,neg_dev, pos_dev, vals_dev, cats_dev ,index_sizes_dev,used_items, ratio)
         data_fn = [i for i in index_e_plus if not cover_(rule, embedded_data_original,i, categorical_cols)]
         if len(index_e_plus) == len(data_fn):
             break
@@ -462,7 +507,7 @@ def split_data_by_item_(embedded_data, l,categorical_cols, original_data_indexes
 
     for i in original_data_indexes:
         x=embedded_data[i]
-        if evaluate_(l, x,categorical_cols):
+        if evaluate_(l, x,categorical_cols,0):
             data_pos.append(i) #lui aggiungeva righe io aggiungo INDICI DELLE COLLONE IN sorted_T
         else:
             data_neg.append(i)

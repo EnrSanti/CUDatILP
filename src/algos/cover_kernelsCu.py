@@ -108,11 +108,12 @@ def update_tn_tp(index_sizes,normal_dev,nodes_dev, literals_dev, edges_dev, embe
     tid = cuda.threadIdx.x
     block_id = cuda.blockIdx.x
     total_found = 0
-    if(block_id==0):
+    if(block_id==0): #plus
         for chunk_start in range(0, len_index_pos, 32):
             pos_in_list = chunk_start + tid
             mask = 0xffffffff
             active = pos_in_list < len_index_pos
+            #which threads didn't pass the index len
             active_mask = cuda.ballot_sync(mask, active)
             # Load value or placeholder
             remove = -1
@@ -121,15 +122,18 @@ def update_tn_tp(index_sizes,normal_dev,nodes_dev, literals_dev, edges_dev, embe
                 remove=0
                 i=index_pos[pos_in_list]
                 covered=evaluate_dev_full_rule(normal_dev,nodes_dev, literals_dev, edges_dev,embedded_data_original[i],categorical_cols)
+                print("th. ",tid, " checking el. ", i, " covered ",covered)
                 if(covered):
                     remove=1
-            ballot = cuda.ballot_sync(active_mask, remove==0)
+            ballot = cuda.ballot_sync(active_mask, remove==0) #conto quelli da tenere
+            print("ballot to keep", ballot)
             lower_mask = (1 << tid) - 1
             dest_idx = total_found + cuda.popc(ballot & lower_mask)
             cuda.syncwarp()
 
             if(remove==0): #keep
                 index_pos[dest_idx]=i
+                #print("keep the positive el in ",i, "th", tid)
             total_found += cuda.popc(ballot)
             cuda.syncwarp()
     else:
@@ -162,7 +166,7 @@ def update_tn_tp(index_sizes,normal_dev,nodes_dev, literals_dev, edges_dev, embe
 @cuda.jit(device=True)
 def evaluate_dev_full_rule(normal,nodes, literals, edges, dataset_example, categorical_cols):
 
-    print("normal gpu normal", normal)
+    #print("normal gpu normal", normal)
     if cuda.threadIdx.x == 0 and cuda.blockIdx.x == 0:
         print("NORMAL:")
         for i in range(1):
