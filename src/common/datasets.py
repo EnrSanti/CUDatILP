@@ -6,7 +6,7 @@ def acute():
     attrs = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6']
     nums = ['a1']
     model = Classifier(attrs=attrs, numeric=nums, label='label')
-    data = model.load_data('data/acute/acute.csv')
+    data = model.load_data('data/acute/acute_orig.csv')
     print('\n% acute dataset', np.shape(data))
     return model, data
 

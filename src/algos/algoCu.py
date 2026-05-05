@@ -118,16 +118,16 @@ def CUDatILP(data, ratio=0.5):
             e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
             e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
             
-            print("first el in flat: ", items_np)
-            print(rule)
-            print("before index_e+: ", index_e_plus)
-            
-            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
+            print("THE INDEX BEFORE index_e_plus: ", index_e_plus)
+            print("size: ",len(index_e_plus))
+            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
+            e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
             
             print("after e_tp_index: ", e_tp_index)
 
             flatRule = FlatState.from_root(rule)
-            flatRule.normal=items_dev
+            print("rule: ",rule)                            
+            print("flatRule: ",flatRule)
             n_valid_tp,n_valid_tn=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,e_tp_index_dev,e_tn_index_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
             
             print("valid tp:",n_valid_tp)
@@ -206,9 +206,11 @@ def CUDatILP(data, ratio=0.5):
     return ret
 
 
-def cover_(rule, embedded_data_original, i,categorical_cols):
+def cover_(rule, embedded_data_original, i,categorical_cols,flag=0):
     example_x=embedded_data_original[i]
-    return evaluate_(rule, example_x, categorical_cols,1)
+    if(flag==1):
+        print("considering example index: ",i)
+    return evaluate_(rule, example_x, categorical_cols,flag)
 
 def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
     
@@ -223,55 +225,60 @@ def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,ind
 def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
     
     #SI, TEMPORANEAMENTE SOLO CON 2 BLOCCHI, con più blocchi servono 2 kernel diversi lanciati uno dopo l'altro
-
-    
-    normal_dev  = rule.normal 
+    print("rule to on gpu: ", rule)
     nodes = np.asarray(rule.nodes, dtype=np.int32)
     literals = np.asarray(rule.literals, dtype=np.int32)
-    edges = np.asarray(rule.edges, dtype=np.int32)
 
     nodes_dev = cuda.to_device(nodes)
     literals_dev = cuda.to_device(literals)
-    edges_dev = cuda.to_device(edges)
 
-    print(rule)
-
-    update_tn_tp[2,32](index_sizes_dev,normal_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+    print_dev[1,1](index_e_plus_dev,size_plus)
+    update_tn_tp[2,32](index_sizes_dev,nodes_dev, literals_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
     host_counts = index_sizes_dev.copy_to_host()
 
     size_plus = int(host_counts[0])
     size_minus = int(host_counts[1])
     return size_plus,size_minus
 
-def evaluate_(item, dataset_example, categorical_cols,flag):
-    print("eval rule ", item)
+def evaluate_(item, dataset_example, categorical_cols,flag=0):
+
     if len(item) == 0:
-        if(flag==1):
-            print("len(item) == 0 returning 0", item)
         return 0  # automatically false
 
     # -------------------------
     # Simple literal case
     # -------------------------
+    if(flag==1):
+        print(f"ITEM AND DATSET EXAMPLE {item}  {dataset_example}")
     if len(item) == 3:
-        if(flag==1):
-            print("len(item) == 3", item)
         i, r, v = item
         val = dataset_example[i]
-
+        
         if i in categorical_cols:
             if r == 2:
+                if(flag==1):
+                    print(f"base case cat comapring col {i} _> {val} == {v} (item {item}) returining {val == v}")
                 return val == v
             elif r == 3:
+                if(flag==1):
+                    print(f"base case cat comapring col {i} _> {val} != {v} (item {item}) returining {val != v}")
                 return val != v
             else:
+                if(flag==1):
+                    print("base case cat false")
                 return False
         else:
             if r == 0:
+                if(flag==1):
+                    print(f"base case num comapring col {i} _> {val} <= {v} (item {item}) returining {val <= v}")
                 return val <= v
             elif r == 1:
+                if(flag==1):
+                    print(f"base case num comapring col {i} _> {val} > {v} (item {item}) returining {val > v}")
                 return val > v
             else:
+                if(flag==1):
+                    print("base case num false")
                 return False
 
     # -------------------------
@@ -282,74 +289,42 @@ def evaluate_(item, dataset_example, categorical_cols,flag):
 
     # If flag == 0 → conjunction must hold
     if item[3] == 0 and len(item[1]) > 0:
-        if(flag==1):
-            print("item[3] == 0 and len(item[1]) > 0", item)
         for sub in item[1]:
-            if len(sub) == 3:
-                i, r, v = sub
-                val = dataset_example[i]
+            i, r, v = sub
+            val = dataset_example[i]
 
-                if i in categorical_cols:
-                    if r == 2:
-                        cond = val == v
-                    elif r == 3:
-                        cond = val != v
-                    else:
-                        cond = False
-
+            if i in categorical_cols:
+                if r == 2:
+                    cond = val == v
+                elif r == 3:
+                    cond = val != v
                 else:
-                    if r == 0:
-                        cond = val <= v
-                    elif r == 1:
-                        cond = val > v
-                    else:
-                        cond = False
-
-              
-                if not cond:
-                    return 0
+                    cond = False
 
             else:
+                if r == 0:
+                    cond = val <= v
+                elif r == 1:
+                    cond = val > v
+                else:
+                    cond = False
+
+            
+            if not cond:
                 if(flag==1):
-                    print("recursive sub", sub)
-                if not evaluate_(sub, dataset_example, categorical_cols,flag):
-                    return 0
+                    print("returning FALSE")
+                return 0
+
                 
 
     # Negative literals (any must NOT hold)
     if len(item[2]) > 0:
-        if(flag==1):
-            print("len(item[2]) > 0", item)
         for sub in item[2]:
-            if len(sub) == 3:
-                i, r, v = sub
-                val = dataset_example[i]
+            if evaluate_(sub, dataset_example, categorical_cols,0): 
+                return False
 
-                if i in categorical_cols:
-                    if r == 2:
-                        cond = val == v
-                    elif r == 3:
-                        cond = val != v
-                    else:
-                        cond = False
-
-                else:
-                    if r == 0:
-                        cond = val <= v
-                    elif r == 1:
-                        cond = val > v
-                    else:
-                        cond = False
-
-
-                if cond:
-                    return 0
-
-            else:
-                if(flag==1):
-                    print("recursive sub", sub)
-                if evaluate_(sub, dataset_example, categorical_cols,flag):
-                    return 0
+    if(flag==1):
+        print("return TRUE")                
     return 1
 
 
@@ -388,7 +363,7 @@ def learn_rule_(embedded_data_original,  index_e_plus,       index_e_minus,     
 
         
 
-        if(len(index_e_plus)+len(index_e_minus)>5000 or True): #remove
+        if(len(index_e_plus)+len(index_e_minus)>5000): #remove
             n_valid_plus,n_valid_minus=cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
             
 

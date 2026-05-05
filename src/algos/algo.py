@@ -48,10 +48,10 @@ def evaluate(item, x):
     if len(item) == 0:
         return 0
     if len(item) == 3:
-        return __eval(item[0], item[1], item[2])
-    if item[3] == 0 and len(item[1]) > 0 and not all([_eval(i) for i in item[1]]):
+        return __eval(item[0], item[1], item[2]) #single pos element
+    if item[3] == 0 and len(item[1]) > 0 and not all([_eval(i) for i in item[1]]): #falso se un solo el vero è falso
         return 0
-    if len(item[2]) > 0 and any([_eval(i) for i in item[2]]):
+    if len(item[2]) > 0 and any([_eval(i) for i in item[2]]): #falso se anche solo un el falso è vero
         return 0
     return 1
 

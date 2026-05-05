@@ -183,7 +183,7 @@ def compare_times():
             (run_test_split, fn, pretty_name, ratio, None)
         )
 
-    n_runs = 5
+    n_runs = 1
     errors = 0
 
     serial_times_all = [[] for _ in benchmark_tasks]
@@ -342,14 +342,32 @@ def plot_test_results(names, serial_times, parallel_times):
     plt.close(fig)
     print(f"Results saved to: {filename}")
 
-# Call this at the very end of your script
+
 def fast_check():
     test_failed=0
-    loaders = [acute]
-    #adult,breastw,autism, credit,heart,kidney, krkp, mushroom
+    loaders = [acute,adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
+
 
     for i in range(len(loaders)):
+        model, data = loaders[i]()   # call function
+        data_train, data_test = split_data_deterministically(data, ratio=0.8)
+        
+        start = timer()
+        model.fit(data_train, ratio=0.4)
+        end = timer()
+        h_cpu=model.get_asp(simple=True)
 
+        Y = [d[-1] for d in data_test]
+        Y_test_hat = model.predict(data_test)
+        accuracy_cpu = get_scores(Y_test_hat, data_test)
+        print('% acc', round(accuracy_cpu, 4), '# rules', len(model.crs))
+        acc, p, r, f1 = scores(Y_test_hat, Y, weighted=True)
+        print('% acc', round(acc, 4), 'macro p r f1', round(p, 4), round(r, 4), round(f1, 4), '# rules', len(model.crs))
+
+        del(model)
+        del(data)
+        del(data_train)
+        del(data_test)
 
         model, data = loaders[i]()   # call function
         data_train, data_test = split_data_deterministically(data, ratio=0.8)
@@ -376,11 +394,32 @@ def fast_check():
         GREEN = "\033[92m"
         RESET = "\033[0m"
         YELLOW = "\033[33m"
+        if h_cpu != h_gpu:
+            if(accuracy_cpu == accuracy_gpu):
+                print(f"{YELLOW}OK WORKS (!= hyp = accuracy){RESET}")
+                print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
+            else:
+                print(f"{RED}test1 failed{RESET}")
+                print(h_cpu+"\n-----------------------------------\n"+h_gpu)
+                test_failed+=1
+        elif(accuracy_cpu != accuracy_gpu):
+            print(f"{RED}ACCURACY DIFFERENCE(?){RESET}")
+            print(str(accuracy_cpu)+"\n-----------------------------------\n"+str(accuracy_gpu))
+            test_failed+=1
+        else:
+            print(f"{GREEN}test1 passed{RESET}")
+            print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
+
+            print(h_cpu+"\n-----------------------------------\n"+h_gpu)
+        
+        
     
     if(test_failed==0):
         print(f"{GREEN}-------------------\nALL passed\n-------------------{RESET}")
     else:        
         print(f"{RED}{test_failed}-------------------\nTEST FAILED\n-------------------{RESET}")
+
+
 
 def main():
     
