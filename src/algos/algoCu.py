@@ -162,7 +162,6 @@ def CUDatILP(data, ratio=0.5):
         #print("remaining embedded_data "+str(embedded_data))
         
         
-        return
         
         end_setop = timer()
 
@@ -296,16 +295,24 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0):
             if i in categorical_cols:
                 if r == 2:
                     cond = val == v
+                    if(flag==1):
+                        print(f"complex case cat comapring col {i} _> {val} == {v} (item {item}) cond {val == v}")
                 elif r == 3:
                     cond = val != v
+                    if(flag==1):
+                        print(f"complex case cat comapring col {i} _> {val} != {v} (item {item}) cond {val != v}")
                 else:
                     cond = False
 
             else:
                 if r == 0:
                     cond = val <= v
+                    if(flag==1):
+                        print(f"complex case num comapring col {i} _> {val} <= {v} (item {item}) cond {val <= v}")
                 elif r == 1:
                     cond = val > v
+                    if(flag==1):
+                        print(f"complex case num comapring col {i} _> {val} > {v} (item {item}) cond {val > v}")
                 else:
                     cond = False
 
@@ -320,7 +327,9 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0):
     # Negative literals (any must NOT hold)
     if len(item[2]) > 0:
         for sub in item[2]:
-            if evaluate_(sub, dataset_example, categorical_cols,0): 
+            if(flag==1):
+                print("evaluating now: ", sub)
+            if evaluate_(sub, dataset_example, categorical_cols,flag): 
                 return False
 
     if(flag==1):

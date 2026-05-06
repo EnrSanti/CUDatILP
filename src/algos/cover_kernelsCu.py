@@ -184,10 +184,14 @@ def evaluate_dev_full_rule(nodes, literals, dataset_example, categorical_cols, e
 
         desired_val=lv%2
         
+        cond=True
+        overall_cond=True
         if(desired_val==0):
             desired_val=1
         else:
             desired_val=0
+
+
 
         #positive part of rule
         for el in range (node_start, node_start+node_len):
@@ -215,10 +219,6 @@ def evaluate_dev_full_rule(nodes, literals, dataset_example, categorical_cols, e
                     cond = val != v
                     if(flag==1):
                         print("th:", cuda.threadIdx.x,"case cat comapring col ",i, " != ", val, v, "resulting: ",int(cond), "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
-                else:
-                    cond = False
-                    if(flag==1):
-                        print("th:", cuda.threadIdx.x,"case cat flase")
             else:
                 if r == 0:
                     cond = val <= v
@@ -228,14 +228,18 @@ def evaluate_dev_full_rule(nodes, literals, dataset_example, categorical_cols, e
                     cond = val > v
                     if(flag==1):
                         print("th:", cuda.threadIdx.x,"case num comapring col ",i, " > ", val, v, "resulting: ",int(cond), "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
-                else:
-                    cond = False
-                    if(flag==1):
-                        print("th:", cuda.threadIdx.x,"case num flase", "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
             
-            if cond != desired_val:
-                if(flag==1):
-                    print("th:", cuda.threadIdx.x,"returning flase", "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
+           
+            overall_cond=overall_cond and cond
+        
+        #-------------------------
+        if(desired_val==1):
+            if(overall_cond==False):
+                print("th:", cuda.threadIdx.x,"returning FALSE for subrule", "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
+                return False
+        else:
+            if(overall_cond==True):
+                print("th:", cuda.threadIdx.x,"returning FALSE for subrule", "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
                 return False
     if(flag==1):
         print("th:", cuda.threadIdx.x,"returning true", "[",dataset_example[0],dataset_example[1],dataset_example[2],dataset_example[3],dataset_example[4],dataset_example[5],dataset_example[6],"]")
