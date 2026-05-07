@@ -138,6 +138,7 @@ def update_tn_tp(index_sizes,nodes_dev, literals_dev, embedded_data_original, ca
                 #print("keep the positive el in ",i, "th", tid)
             total_found += cuda.popc(ballot)
             cuda.syncwarp()
+            break #REMOVE
     else:
         for chunk_start in range(0, len_index_neg, 32):
             pos_in_list = chunk_start + tid

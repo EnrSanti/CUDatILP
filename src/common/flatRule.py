@@ -14,12 +14,11 @@ class FlatState:
     def _flatten(cls, root):
 
         state = cls()
-        stack = [root]
-        lv=0
+        stack = [(root,0)]
 
         while stack:
 
-            node = stack.pop()
+            node,lv = stack.pop()
 
             _, L, subrules, _ = node
 
@@ -29,8 +28,8 @@ class FlatState:
             #aggiunge node
             state.nodes.append([start_L, len(L),lv])
 
+            lv+=1
             for sub in subrules:
+                stack.append((sub,lv))
 
-                stack.append(sub)
-                lv=+1
         return state

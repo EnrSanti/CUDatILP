@@ -26,7 +26,9 @@ def CUDatILP(data, ratio=0.5):
     overall_fold = 0 
     total_time = 0 
     learn_rule_loops = 0
- 
+    
+    debug_loops=0
+    
     begin_preprocess = timer()
     embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data)
     
@@ -114,23 +116,24 @@ def CUDatILP(data, ratio=0.5):
         start_covers1 = timer()
         start_setop = timer()
         if(len(index_e_plus)+len(index_e_minus)>5000 or True): #true for now, just to check
-
+            
+            debug_loops+=1
             e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
             e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
             
-            print("THE INDEX BEFORE index_e_plus: ", index_e_plus)
-            print("size: ",len(index_e_plus))
-            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
-            e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
+            #print("THE INDEX BEFORE index_e_plus: ", index_e_plus)
+            #print("size: ",len(index_e_plus))
+            #e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
+            #e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
             
-            print("after e_tp_index: ", e_tp_index)
+            #print("after e_tp_index: ", e_tp_index)
 
             flatRule = FlatState.from_root(rule)
-            print("rule: ",rule)                            
-            print("flatRule: ",flatRule)
+            #print("rule: ",rule)                            
+            #print("flatRule: ",flatRule)
             n_valid_tp,n_valid_tn=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,e_tp_index_dev,e_tn_index_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
             
-            print("valid tp:",n_valid_tp)
+            #print("valid tp:",n_valid_tp)
 
             # 2. Taglia l'array direttamente sulla GPU (lo slicing in Numba non copia dati)
             # e POI copia solo la parte utile sull'host
@@ -143,10 +146,14 @@ def CUDatILP(data, ratio=0.5):
             else:
                 e_tn_index=[]
 
-            print("after GPU e_tp_index: ", e_tp_index)
+            print("loop: ",debug_loops, "\n tp_index: ",e_tp_index,"\n tn_index: ",e_tn_index)
+
+            #print("after GPU e_tp_index: ", e_tp_index)
             original_data_indexes = e_tp_index + e_tn_index
 
         else:
+            print(rule)
+            debug_loops+=1
             e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
 
             end_covers1 = timer()
@@ -154,15 +161,18 @@ def CUDatILP(data, ratio=0.5):
 
             if len(e_tp_index) == len(index_e_plus):
                 break
+
             e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols)]
+            print("loop: ",debug_loops, "\n tp_index: ",e_tp_index,"\n tn_index: ",e_tn_index)
             original_data_indexes = e_tp_index + e_tn_index
+
 
         #print("----------\n")
         #print("remaining original data indexes "+str(original_data_indexes))
         #print("remaining embedded_data "+str(embedded_data))
         
         
-        
+        return 
         end_setop = timer()
 
         overall_setop += end_setop - start_setop
@@ -231,7 +241,7 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
     nodes_dev = cuda.to_device(nodes)
     literals_dev = cuda.to_device(literals)
 
-    print_dev[1,1](index_e_plus_dev,size_plus)
+    #print_dev[1,1](index_e_plus_dev,size_plus)
     update_tn_tp[2,32](index_sizes_dev,nodes_dev, literals_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
     host_counts = index_sizes_dev.copy_to_host()
 
