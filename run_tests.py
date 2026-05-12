@@ -345,7 +345,8 @@ def plot_test_results(names, serial_times, parallel_times):
 
 def fast_check():
     test_failed=0
-    loaders = [adult]
+    loaders = [acute,adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
+
 
 
     for i in range(len(loaders)):
@@ -424,7 +425,7 @@ def fast_check():
 def main():
     
     fast_check()
-    compare_times()
+    #compare_times()
 
 if __name__ == '__main__':
     main()

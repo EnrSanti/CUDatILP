@@ -123,11 +123,14 @@ def CUDatILP(data, ratio=0.5):
             
             #print("THE INDEX BEFORE index_e_plus: ", index_e_plus)
             #print("size: ",len(index_e_plus))
-            #e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
-            #e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
+            #print("original index e_plus: ", index_e_plus)
+            #print("original index e_minus: ", index_e_minus)
+            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
+            e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
             
             #print("after e_tp_index: ", e_tp_index)
-
+            #print("after e_tn_index: ", e_tn_index)
+            
             flatRule = FlatState.from_root(rule)
             #print("rule: ",rule)                            
             #print("flatRule: ",flatRule)
@@ -146,13 +149,16 @@ def CUDatILP(data, ratio=0.5):
             else:
                 e_tn_index=[]
 
-            print("loop: ",debug_loops, "\n tp_index: ",e_tp_index,"\n tn_index: ",e_tn_index)
+            #print("loop: ",debug_loops, "\n tp_index: ",e_tp_index,"\n tn_index: ",e_tn_index)
 
             #print("after GPU e_tp_index: ", e_tp_index)
             original_data_indexes = e_tp_index + e_tn_index
 
         else:
             print(rule)
+            
+            print("original index e_plus: ", index_e_plus)
+            print("original index e_minus: ", index_e_minus)
             debug_loops+=1
             e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
 
@@ -172,7 +178,7 @@ def CUDatILP(data, ratio=0.5):
         #print("remaining embedded_data "+str(embedded_data))
         
         
-        return 
+         
         end_setop = timer()
 
         overall_setop += end_setop - start_setop
@@ -217,9 +223,13 @@ def CUDatILP(data, ratio=0.5):
 
 def cover_(rule, embedded_data_original, i,categorical_cols,flag=0):
     example_x=embedded_data_original[i]
-    if(flag==1):
+    
+    that=0
+    if(i==2):
+        that=1
+    if(that==1):
         print("considering example index: ",i)
-    return evaluate_(rule, example_x, categorical_cols,flag)
+    return evaluate_(rule, example_x, categorical_cols,flag,that)
 
 def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
     
@@ -237,19 +247,23 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
     print("rule to on gpu: ", rule)
     nodes = np.asarray(rule.nodes, dtype=np.int32)
     literals = np.asarray(rule.literals, dtype=np.int32)
+    edges = np.asarray(rule.edges, dtype=np.int32).reshape(-1, 2)
 
     nodes_dev = cuda.to_device(nodes)
     literals_dev = cuda.to_device(literals)
+    edges_dev = cuda.to_device(edges)
 
     #print_dev[1,1](index_e_plus_dev,size_plus)
-    update_tn_tp[2,32](index_sizes_dev,nodes_dev, literals_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+    update_tn_tp[2,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
     host_counts = index_sizes_dev.copy_to_host()
 
     size_plus = int(host_counts[0])
     size_minus = int(host_counts[1])
+    print("plus to keep: ", size_plus)
+    print("minus to keep", size_minus)
     return size_plus,size_minus
 
-def evaluate_(item, dataset_example, categorical_cols,flag=0):
+def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
 
     if len(item) == 0:
         return 0  # automatically false
@@ -257,6 +271,8 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0):
     # -------------------------
     # Simple literal case
     # -------------------------
+    if(that==0):
+        flag=0
     if(flag==1):
         print(f"ITEM AND DATSET EXAMPLE {item}  {dataset_example}")
     if len(item) == 3:
@@ -329,7 +345,7 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0):
             
             if not cond:
                 if(flag==1):
-                    print("returning FALSE")
+                    print("return FALSE")
                 return 0
 
                 
@@ -339,7 +355,10 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0):
         for sub in item[2]:
             if(flag==1):
                 print("evaluating now: ", sub)
-            if evaluate_(sub, dataset_example, categorical_cols,flag): 
+            if evaluate_(sub, dataset_example, categorical_cols,flag,that): 
+                
+                if(flag==1):
+                    print("return FALSE (level up)")
                 return False
 
     if(flag==1):
