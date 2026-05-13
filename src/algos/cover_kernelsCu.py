@@ -151,7 +151,6 @@ def update_tn_tp(index_sizes,nodes_dev, literals_dev,edges_dev, embedded_data_or
                 i=index_neg[pos_in_list]
                 covered=evaluate_dev_full_rule(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols,i,1)
                 if(covered):
-                    #print("TO REMOVE IN NEG")
                     remove=1
             ballot = cuda.ballot_sync(active_mask, remove==0)
             lower_mask = (1 << tid) - 1
@@ -183,9 +182,6 @@ def evaluate_dev_full_rule(nodes, literals,edges, dataset_example, categorical_c
     if(nodes_no>128):
         print("ISSUE WITH THE NUMBER OF NODES! ")
 
-    for i in range(128):
-        stack_evals[i]=-1
-
     #start from ending noeds which are single parts
     for node_idx in range(len(nodes) - 1, -1, -1):
         _, node_start, node_len = nodes[node_idx]
@@ -196,14 +192,10 @@ def evaluate_dev_full_rule(nodes, literals,edges, dataset_example, categorical_c
             #print("checking children")
             if edges[edge,0] == node_idx:
                 child_index = edges[edge,1]
-                if(stack_evals[child_index]==-1):
-                    print("ERROR IN ACCESSING NODES")
                 child_val=stack_evals[child_index]
                 falsified_by_children |= child_val
-          
-                #if(flag==1 and cuda.threadIdx.x==1):
-                #    print("th:", cuda.threadIdx.x ,"children node: ", child_index, "evaluated to: ", child_val, "overall for now: ", falsified_by_children)
-        
+
+                
         for el in range (node_start, node_start+node_len):
                 
             #evaluate positive vals
@@ -211,10 +203,8 @@ def evaluate_dev_full_rule(nodes, literals,edges, dataset_example, categorical_c
             
             #falsified_by_children TRUE <=> all children are true or NO CHILDREN
             
-            #if(flag==1 and cuda.threadIdx.x==1):
-            #    print("FOR EACH TRIPLE th:", cuda.threadIdx.x,"col ",i, "falsified_by_children: ", falsified_by_children, "children: ", children)
-
-            if( not falsified_by_children): #i eval only if children didn't already falsified me 
+            
+            if(not falsified_by_children): #i eval only if children didn't already falsified me 
                 #if(flag==1):
                 #    print("th:", cuda.threadIdx.x,"col ",i, "falsified_by_children: ", falsified_by_children)
                 val = dataset_example[i]
@@ -238,17 +228,9 @@ def evaluate_dev_full_rule(nodes, literals,edges, dataset_example, categorical_c
             else:
                 cond=False
 
-            #if(flag==1 and cuda.threadIdx.x==1):
-            #    print("th. ",cuda.threadIdx.x," node: ", node_idx, "value: ", int(cond))
             
             stack_evals[node_idx]=cond #eval node
-    '''     
-    if(flag==1 and cuda.threadIdx.x==1):
-        if(stack_evals[0]==0):
-            print("evaluating now gpu: FALSE ", example_no) 
-        else:
-            print("evaluating now gpu: TRUE ", example_no)
-    '''     
+   
     return stack_evals[0]
   
 

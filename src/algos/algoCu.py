@@ -27,7 +27,6 @@ def CUDatILP(data, ratio=0.5):
     total_time = 0 
     learn_rule_loops = 0
     
-    debug_loops=0
     
     begin_preprocess = timer()
     embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data)
@@ -115,22 +114,21 @@ def CUDatILP(data, ratio=0.5):
         
         start_covers1 = timer()
         start_setop = timer()
-        if(len(index_e_plus)+len(index_e_minus)>5000 or True): #true for now, just to check
+        if(len(index_e_plus)+len(index_e_minus)>5000): #true for now, just to check
             
-            debug_loops+=1
             e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
             e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
             
             #print("THE INDEX BEFORE index_e_plus: ", index_e_plus)
             #print("size: ",len(index_e_plus))
-            #print("original index e_plus: ", index_e_plus)
-            #print("original index e_minus: ", index_e_minus)
-            e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
-            e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
+            #print("original index e_plus: ", len(index_e_plus))
+            #print("original index e_minus: ", len(index_e_plus))
+            #e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
+            #e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
             
-            #print("after e_tp_index: ", e_tp_index)
-            #print("after e_tn_index: ", e_tn_index)
-            
+            #print("SERIAL plus to keep: ", len(e_tp_index))
+            #print("-minus to keep: ", len(e_tn_index))
+            #print(rule)
             flatRule = FlatState.from_root(rule)
             #print("rule: ",rule)                            
             #print("flatRule: ",flatRule)
@@ -151,15 +149,12 @@ def CUDatILP(data, ratio=0.5):
 
             #print("loop: ",debug_loops, "\n tp_index: ",e_tp_index,"\n tn_index: ",e_tn_index)
 
+            if len(e_tp_index) == len(index_e_plus):
+                break
             #print("after GPU e_tp_index: ", e_tp_index)
             original_data_indexes = e_tp_index + e_tn_index
 
         else:
-            print(rule)
-            
-            print("original index e_plus: ", index_e_plus)
-            print("original index e_minus: ", index_e_minus)
-            debug_loops+=1
             e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
 
             end_covers1 = timer()
@@ -169,7 +164,6 @@ def CUDatILP(data, ratio=0.5):
                 break
 
             e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols)]
-            print("loop: ",debug_loops, "\n tp_index: ",e_tp_index,"\n tn_index: ",e_tn_index)
             original_data_indexes = e_tp_index + e_tn_index
 
 
@@ -224,12 +218,7 @@ def CUDatILP(data, ratio=0.5):
 def cover_(rule, embedded_data_original, i,categorical_cols,flag=0):
     example_x=embedded_data_original[i]
     
-    that=0
-    if(i==2):
-        that=1
-    if(that==1):
-        print("considering example index: ",i)
-    return evaluate_(rule, example_x, categorical_cols,flag,that)
+    return evaluate_(rule, example_x, categorical_cols,flag,0)
 
 def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
     
@@ -244,7 +233,7 @@ def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,ind
 def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
     
     #SI, TEMPORANEAMENTE SOLO CON 2 BLOCCHI, con più blocchi servono 2 kernel diversi lanciati uno dopo l'altro
-    print("rule to on gpu: ", rule)
+    #print("rule to on gpu: ", rule)
     nodes = np.asarray(rule.nodes, dtype=np.int32)
     literals = np.asarray(rule.literals, dtype=np.int32)
     edges = np.asarray(rule.edges, dtype=np.int32).reshape(-1, 2)
@@ -259,8 +248,8 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
 
     size_plus = int(host_counts[0])
     size_minus = int(host_counts[1])
-    print("plus to keep: ", size_plus)
-    print("minus to keep", size_minus)
+    #print("plus to keep: ", size_plus)
+    #print("-minus to keep: ", size_minus)
     return size_plus,size_minus
 
 def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
@@ -271,39 +260,23 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
     # -------------------------
     # Simple literal case
     # -------------------------
-    if(that==0):
-        flag=0
-    if(flag==1):
-        print(f"ITEM AND DATSET EXAMPLE {item}  {dataset_example}")
     if len(item) == 3:
         i, r, v = item
         val = dataset_example[i]
         
         if i in categorical_cols:
             if r == 2:
-                if(flag==1):
-                    print(f"base case cat comapring col {i} _> {val} == {v} (item {item}) returining {val == v}")
                 return val == v
             elif r == 3:
-                if(flag==1):
-                    print(f"base case cat comapring col {i} _> {val} != {v} (item {item}) returining {val != v}")
                 return val != v
             else:
-                if(flag==1):
-                    print("base case cat false")
                 return False
         else:
             if r == 0:
-                if(flag==1):
-                    print(f"base case num comapring col {i} _> {val} <= {v} (item {item}) returining {val <= v}")
                 return val <= v
             elif r == 1:
-                if(flag==1):
-                    print(f"base case num comapring col {i} _> {val} > {v} (item {item}) returining {val > v}")
                 return val > v
             else:
-                if(flag==1):
-                    print("base case num false")
                 return False
 
     # -------------------------
@@ -321,31 +294,24 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
             if i in categorical_cols:
                 if r == 2:
                     cond = val == v
-                    if(flag==1):
-                        print(f"complex case cat comapring col {i} _> {val} == {v} (item {item}) cond {val == v}")
                 elif r == 3:
                     cond = val != v
-                    if(flag==1):
-                        print(f"complex case cat comapring col {i} _> {val} != {v} (item {item}) cond {val != v}")
+                    
                 else:
                     cond = False
 
             else:
                 if r == 0:
                     cond = val <= v
-                    if(flag==1):
-                        print(f"complex case num comapring col {i} _> {val} <= {v} (item {item}) cond {val <= v}")
                 elif r == 1:
                     cond = val > v
-                    if(flag==1):
-                        print(f"complex case num comapring col {i} _> {val} > {v} (item {item}) cond {val > v}")
+                    
                 else:
                     cond = False
 
             
             if not cond:
-                if(flag==1):
-                    print("return FALSE")
+                
                 return 0
 
                 
@@ -353,16 +319,12 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
     # Negative literals (any must NOT hold)
     if len(item[2]) > 0:
         for sub in item[2]:
-            if(flag==1):
-                print("evaluating now: ", sub)
+            
             if evaluate_(sub, dataset_example, categorical_cols,flag,that): 
                 
-                if(flag==1):
-                    print("return FALSE (level up)")
+                
                 return False
-
-    if(flag==1):
-        print("return TRUE")                
+          
     return 1
 
 

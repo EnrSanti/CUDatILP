@@ -171,7 +171,6 @@ def compare_times():
 
     
 
-    # --- split datasets ---
     for name, (fn, pretty_name, ds_ratio, fit_ratio) in datasets_to_split.items():
         benchmark_tasks.append(
             (run_test_to_split_ds, fn, pretty_name, fit_ratio,ds_ratio)
@@ -183,7 +182,8 @@ def compare_times():
             (run_test_split, fn, pretty_name, ratio, None)
         )
 
-    n_runs = 1
+
+    n_runs = 5
     errors = 0
 
     serial_times_all = [[] for _ in benchmark_tasks]
@@ -411,7 +411,7 @@ def fast_check():
             print(f"{GREEN}test1 passed{RESET}")
             print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
 
-            print(h_cpu+"\n-----------------------------------\n"+h_gpu)
+            #print(h_cpu+"\n-----------------------------------\n"+h_gpu)
         
         
     
@@ -424,8 +424,8 @@ def fast_check():
 
 def main():
     
-    fast_check()
-    #compare_times()
+    #fast_check()
+    compare_times()
 
 if __name__ == '__main__':
     main()
