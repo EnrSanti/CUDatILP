@@ -156,11 +156,7 @@ datasets_to_split = {
     "lifestyle": (lifestyle,"lifestyle",0.8,0.2),
     "sloan": (sloan,"sloan",0.9,0.3),
     "diabetes": (diabetes,"diabetes",0.8,0.25),
-    "smoke_drink": (smoke_drink,"smoke_drink",0.7,0.4),
-    "covertype": (coverType,"covertype",0.8,0.2),
-    "crops": (crops,"crops",0.8,0.3),
-    "nepal_earthquake": (nepal_earthquake,"nepal_earthquake",0.7,0.3),
-    "weather": (weather,"weather",0.8,0.25)
+    "smoke_drink": (smoke_drink,"smoke_drink",0.7,0.4)
     }
     
 

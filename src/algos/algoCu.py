@@ -128,7 +128,7 @@ def CUDatILP(data, ratio=0.5):
             
             #print("SERIAL plus to keep: ", len(e_tp_index))
             #print("-minus to keep: ", len(e_tn_index))
-            #print(rule)
+            #print("rule -> ", rule)
             flatRule = FlatState.from_root(rule)
             #print("rule: ",rule)                            
             #print("flatRule: ",flatRule)
@@ -235,7 +235,8 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
     #SI, TEMPORANEAMENTE SOLO CON 2 BLOCCHI, con più blocchi servono 2 kernel diversi lanciati uno dopo l'altro
     #print("rule to on gpu: ", rule)
     nodes = np.asarray(rule.nodes, dtype=np.int32)
-    literals = np.asarray(rule.literals, dtype=np.int32)
+    #print(rule.literals)
+    literals = np.asarray(rule.literals, dtype=np.float32)
     edges = np.asarray(rule.edges, dtype=np.int32).reshape(-1, 2)
 
     nodes_dev = cuda.to_device(nodes)
@@ -243,7 +244,11 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
     edges_dev = cuda.to_device(edges)
 
     #print_dev[1,1](index_e_plus_dev,size_plus)
-    update_tn_tp[2,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+    if(len(rule.nodes)<128):
+        update_tn_tp_128nodes[2,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+    else:
+        update_tn_tp_256nodes[2,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+
     host_counts = index_sizes_dev.copy_to_host()
 
     size_plus = int(host_counts[0])
