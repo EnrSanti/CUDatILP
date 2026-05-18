@@ -103,130 +103,78 @@ def update_e_plus_min_dev(index_sizes,items, embedded_data_original, categorical
 
 #molto temporanamente solo con due blocchi, con più blocchi servono 2 lanci di kernel diversi
 @cuda.jit
-def update_tn_tp_128nodes(index_sizes,nodes_dev, literals_dev,edges_dev, embedded_data_original, categorical_cols,index_pos,len_index_pos,index_neg,len_index_neg):
+def update_tn_tp_128nodes(index_sizes,nodes_dev, literals_dev,edges_dev, embedded_data_original, categorical_cols,index,len_index,where_report):
     #molto temporanamente solo con due blocchi, con più blocchi servono 2 lanci di kernel diversi    
     tid = cuda.threadIdx.x
-    block_id = cuda.blockIdx.x
     total_found = 0
-    if(block_id==0): #plus
 
-        for chunk_start in range(0, len_index_pos, 32):
-            pos_in_list = chunk_start + tid
-            mask = 0xffffffff
-            active = pos_in_list < len_index_pos
-            #which threads didn't pass the index len
-            active_mask = cuda.ballot_sync(mask, active)
-            # Load value or placeholder
-            remove = -1
-            i=-1
-            if active:
-                remove=0
-                i=index_pos[pos_in_list]
-                covered=evaluate_dev_full_rule_128nodes(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
-                if(covered):
-                    remove=1
-            ballot = cuda.ballot_sync(active_mask, remove==0) #conto quelli da tenere
-            #print("ballot to keep", ballot)
-            lower_mask = (1 << tid) - 1
-            dest_idx = total_found + cuda.popc(ballot & lower_mask)
-            cuda.syncwarp()
+    for chunk_start in range(0, len_index, 32):
+        pos_in_list = chunk_start + tid
+        mask = 0xffffffff
+        active = pos_in_list < len_index
+        #which threads didn't pass the index len
+        active_mask = cuda.ballot_sync(mask, active)
+        # Load value or placeholder
+        remove = -1
+        i=-1
+        if active:
+            remove=0
+            i=index[pos_in_list]
+            covered=evaluate_dev_full_rule_128nodes(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
+            if(covered):
+                remove=1
+        ballot = cuda.ballot_sync(active_mask, remove==0) #conto quelli da tenere
+        #print("ballot to keep", ballot)
+        lower_mask = (1 << tid) - 1
+        dest_idx = total_found + cuda.popc(ballot & lower_mask)
+        cuda.syncwarp()
 
-            if(remove==0): #keep
-                index_pos[dest_idx]=i
-                #print("keep the positive el in ",i, "th", tid)
-            total_found += cuda.popc(ballot)
-            cuda.syncwarp()
-            #break #REMOVE
-    else:
-        for chunk_start in range(0, len_index_neg, 32):
-            pos_in_list = chunk_start + tid
-            mask = 0xffffffff
-            active = pos_in_list < len_index_neg
-            active_mask = cuda.ballot_sync(mask, active)
-            # Load value or placeholder
-            remove = -1
-            i=-1
-            if active:
-                remove=0
-                i=index_neg[pos_in_list]
-                covered=evaluate_dev_full_rule_128nodes(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
-                if(covered):
-                    remove=1
-            ballot = cuda.ballot_sync(active_mask, remove==0)
-            lower_mask = (1 << tid) - 1
-            dest_idx = total_found + cuda.popc(ballot & lower_mask)
-            cuda.syncwarp()
-
-            if(remove==0): #keep
-                index_neg[dest_idx]=i
-            total_found += cuda.popc(ballot)
-            cuda.syncwarp()
+        if(remove==0): #keep
+            index[dest_idx]=i
+            #print("keep the positive el in ",i, "th", tid)
+        total_found += cuda.popc(ballot)
+        cuda.syncwarp()
+        #break #REMOVE
     if(tid==0):
-        index_sizes[block_id]=total_found
+        index_sizes[where_report]=total_found
 
 
 #molto temporanamente solo con due blocchi, con più blocchi servono 2 lanci di kernel diversi
 @cuda.jit
-def update_tn_tp_256nodes(index_sizes,nodes_dev, literals_dev,edges_dev, embedded_data_original, categorical_cols,index_pos,len_index_pos,index_neg,len_index_neg):
+def update_tn_tp_256nodes(index_sizes,nodes_dev, literals_dev,edges_dev, embedded_data_original, categorical_cols,index,len_index,where_report):
     #molto temporanamente solo con due blocchi, con più blocchi servono 2 lanci di kernel diversi    
     tid = cuda.threadIdx.x
-    block_id = cuda.blockIdx.x
     total_found = 0
-    if(block_id==0): #plus
 
-        for chunk_start in range(0, len_index_pos, 32):
-            pos_in_list = chunk_start + tid
-            mask = 0xffffffff
-            active = pos_in_list < len_index_pos
-            #which threads didn't pass the index len
-            active_mask = cuda.ballot_sync(mask, active)
-            # Load value or placeholder
-            remove = -1
-            i=-1
-            if active:
-                remove=0
-                i=index_pos[pos_in_list]
-                covered=evaluate_dev_full_rule_256nodes(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
-                if(covered):
-                    remove=1
-            ballot = cuda.ballot_sync(active_mask, remove==0) #conto quelli da tenere
-            #print("ballot to keep", ballot)
-            lower_mask = (1 << tid) - 1
-            dest_idx = total_found + cuda.popc(ballot & lower_mask)
-            cuda.syncwarp()
+    for chunk_start in range(0, len_index, 32):
+        pos_in_list = chunk_start + tid
+        mask = 0xffffffff
+        active = pos_in_list < len_index
+        #which threads didn't pass the index len
+        active_mask = cuda.ballot_sync(mask, active)
+        # Load value or placeholder
+        remove = -1
+        i=-1
+        if active:
+            remove=0
+            i=index[pos_in_list]
+            covered=evaluate_dev_full_rule_256nodes(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
+            if(covered):
+                remove=1
+        ballot = cuda.ballot_sync(active_mask, remove==0) #conto quelli da tenere
+        #print("ballot to keep", ballot)
+        lower_mask = (1 << tid) - 1
+        dest_idx = total_found + cuda.popc(ballot & lower_mask)
+        cuda.syncwarp()
 
-            if(remove==0): #keep
-                index_pos[dest_idx]=i
-                #print("keep the positive el in ",i, "th", tid)
-            total_found += cuda.popc(ballot)
-            cuda.syncwarp()
-            #break #REMOVE
-    else:
-        for chunk_start in range(0, len_index_neg, 32):
-            pos_in_list = chunk_start + tid
-            mask = 0xffffffff
-            active = pos_in_list < len_index_neg
-            active_mask = cuda.ballot_sync(mask, active)
-            # Load value or placeholder
-            remove = -1
-            i=-1
-            if active:
-                remove=0
-                i=index_neg[pos_in_list]
-                covered=evaluate_dev_full_rule_256nodes(nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
-                if(covered):
-                    remove=1
-            ballot = cuda.ballot_sync(active_mask, remove==0)
-            lower_mask = (1 << tid) - 1
-            dest_idx = total_found + cuda.popc(ballot & lower_mask)
-            cuda.syncwarp()
-
-            if(remove==0): #keep
-                index_neg[dest_idx]=i
-            total_found += cuda.popc(ballot)
-            cuda.syncwarp()
+        if(remove==0): #keep
+            index[dest_idx]=i
+            #print("keep the positive el in ",i, "th", tid)
+        total_found += cuda.popc(ballot)
+        cuda.syncwarp()
+        #break #REMOVE
     if(tid==0):
-        index_sizes[block_id]=total_found
+        index_sizes[where_report]=total_found
 
 
 

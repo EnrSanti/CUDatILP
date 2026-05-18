@@ -245,10 +245,13 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
 
     #print_dev[1,1](index_e_plus_dev,size_plus)
     if(len(rule.nodes)<128):
-        update_tn_tp_128nodes[2,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
+        update_tn_tp_128nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,0)
+        update_tn_tp_128nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus,1)
+    
     else:
-        update_tn_tp_256nodes[2,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,index_e_minus_dev,size_minus)
-
+        update_tn_tp_256nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,0)
+        update_tn_tp_256nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus,1)
+    #else2:
     host_counts = index_sizes_dev.copy_to_host()
 
     size_plus = int(host_counts[0])

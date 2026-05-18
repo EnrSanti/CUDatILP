@@ -183,7 +183,7 @@ def compare_times():
         )
 
 
-    n_runs = 5
+    n_runs = 1
     errors = 0
 
     serial_times_all = [[] for _ in benchmark_tasks]
