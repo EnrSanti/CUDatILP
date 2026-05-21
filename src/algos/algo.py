@@ -225,7 +225,6 @@ def foldrm(data, ratio=0.5):
     overall_most = 0
     overall_split = 0
     overall_learn = 0
-    overall_covers1 = 0
     overall_setop = 0
     total_loops = 0
     overall_best_item=0
@@ -257,15 +256,13 @@ def foldrm(data, ratio=0.5):
         end_learn = timer()
         overall_learn += end_learn - start_learn
         
-        start_covers1 = timer()
+        
+        start_setop = timer()
         e_tp = [e_plus[i] for i in range(len(e_plus)) if not cover(rule, e_plus[i])]
-        end_covers1 = timer()
-        overall_covers1 += end_covers1 - start_covers1
-
+        
         if len(e_tp) == len(e_plus):
             break
 
-        start_setop = timer()
         data = e_tp + [e_minus[i] for i in range(len(e_minus)) if not cover(rule, e_minus[i])]
         end_setop = timer()
 
@@ -276,7 +273,7 @@ def foldrm(data, ratio=0.5):
         ret.append(rule)
     
     # Total time spent
-    total_time = overall_most + overall_split + overall_learn + overall_covers1 + overall_setop
+    total_time = overall_most + overall_split + overall_learn + overall_setop
 
     print(f"Timing summary after {total_loops} loops:")
     print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
@@ -289,7 +286,6 @@ def foldrm(data, ratio=0.5):
     print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
     print(f"----Total:     {total_time:.4f}s")
 
-    print(f"cover check: {overall_covers1:.4f}s ({100 * overall_covers1/total_time:.1f}%)")
     print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
     print(f"Total:       {total_time:.4f}s")
 

@@ -18,7 +18,6 @@ def CUDatILP(data, ratio=0.5):
     overall_most = 0
     overall_split = 0
     overall_learn = 0
-    overall_covers1 = 0
     overall_setop = 0
     total_loops = 0
     overall_best_item=0
@@ -78,6 +77,13 @@ def CUDatILP(data, ratio=0.5):
     vals_dev = cuda.device_array(max(max_range_cols)*num_blocks, dtype=np.int32)
     cats_dev = cuda.device_array(max(max_range_cols)*num_blocks, dtype=np.int32)
     index_sizes_dev = cuda.device_array(2, dtype=np.int32) #e+ e-
+    
+    num_blocks_cover=int((len(data)+ 128 - 1) / 128)
+    index_sizes_dev_pos_dev = cuda.device_array(num_blocks_cover, dtype=np.int32)
+    index_to_compact_pos_dev = cuda.device_array(len(data), dtype=np.int32)
+    index_sizes_dev_neg_dev = cuda.device_array(num_blocks_cover, dtype=np.int32)
+    index_to_compact_neg_dev = cuda.device_array(len(data), dtype=np.int32)
+
     post_time=0
     while len(original_data_indexes) > 0:
         total_loops += 1
@@ -112,27 +118,20 @@ def CUDatILP(data, ratio=0.5):
         end_learn = timer()
         overall_learn += end_learn - start_learn
         
-        start_covers1 = timer()
         start_setop = timer()
-        if(len(index_e_plus)+len(index_e_minus)>5000): #true for now, just to check
+        if(len(index_e_plus)+len(index_e_minus)>5000 or True): #true for now, just to check
             
             e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
             e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
             
-            #print("THE INDEX BEFORE index_e_plus: ", index_e_plus)
-            #print("size: ",len(index_e_plus))
-            #print("original index e_plus: ", len(index_e_plus))
-            #print("original index e_minus: ", len(index_e_plus))
             #e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
             #e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
             
-            #print("SERIAL plus to keep: ", len(e_tp_index))
-            #print("-minus to keep: ", len(e_tn_index))
             #print("rule -> ", rule)
             flatRule = FlatState.from_root(rule)
             #print("rule: ",rule)                            
             #print("flatRule: ",flatRule)
-            n_valid_tp,n_valid_tn=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,e_tp_index_dev,e_tn_index_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
+            n_valid_tp,n_valid_tn=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,e_tp_index_dev,e_tn_index_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev, index_sizes_dev_pos_dev,index_to_compact_pos_dev,index_sizes_dev_neg_dev,index_to_compact_neg_dev)
             
             #print("valid tp:",n_valid_tp)
 
@@ -157,8 +156,6 @@ def CUDatILP(data, ratio=0.5):
         else:
             e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols)]
 
-            end_covers1 = timer()
-            overall_covers1 += end_covers1 - start_covers1
 
             if len(e_tp_index) == len(index_e_plus):
                 break
@@ -192,7 +189,7 @@ def CUDatILP(data, ratio=0.5):
     # Total time spent
     #print("all rules")
     #print(ret)
-    total_time = overall_most + overall_split + overall_learn + overall_covers1 + overall_setop
+    total_time = overall_most + overall_split + overall_learn + overall_setop
 
     print(f"Timing summary after {total_loops} loops:")
     print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
@@ -204,8 +201,6 @@ def CUDatILP(data, ratio=0.5):
     print(f"----cover:     {overall_covers:.4f}s ({100 * overall_covers/total_time:.1f}%)")
     print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
 
-
-    print(f"cover check: {overall_covers1:.4f}s ({100 * overall_covers1/total_time:.1f}%)")
     print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
     print(f"Total:       {total_time:.4f}s")
 
@@ -230,34 +225,48 @@ def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,ind
     size_minus = int(host_counts[1])
     return size_plus,size_minus
 
-def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
+def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev,index_sizes_dev_pos,index_to_compact_pos,index_sizes_dev_neg,index_to_compact_neg):
     
-    #SI, TEMPORANEAMENTE SOLO CON 2 BLOCCHI, con più blocchi servono 2 kernel diversi lanciati uno dopo l'altro
-    #print("rule to on gpu: ", rule)
+    #si si può compattare tutto in 2 kernel e non 4 launci
+    
     nodes = np.asarray(rule.nodes, dtype=np.int32)
-    #print(rule.literals)
     literals = np.asarray(rule.literals, dtype=np.float32)
     edges = np.asarray(rule.edges, dtype=np.int32).reshape(-1, 2)
 
     nodes_dev = cuda.to_device(nodes)
     literals_dev = cuda.to_device(literals)
     edges_dev = cuda.to_device(edges)
-
-    #print_dev[1,1](index_e_plus_dev,size_plus)
-    if(len(rule.nodes)<128):
-        update_tn_tp_128nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,0)
-        update_tn_tp_128nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus,1)
     
+    #print_dev[1,1](index_e_plus_dev,size_plus)
+    positive_blocks=int((size_plus + 128 - 1) / 128)
+    negative_blocks=int((size_minus + 128 - 1) / 128)
+ 
+    
+    if(len(rule.nodes)<128):
+        if(positive_blocks>0):  
+            update_tn_tp_128nodes[positive_blocks,32](index_sizes_dev_pos,index_to_compact_pos,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus)
+        if(negative_blocks>0):
+            update_tn_tp_128nodes[negative_blocks,32](index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
     else:
-        update_tn_tp_256nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus,0)
-        update_tn_tp_256nodes[1,32](index_sizes_dev,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus,1)
+        if(positive_blocks>0):
+            update_tn_tp_256nodes[positive_blocks,32](index_sizes_dev_pos,index_to_compact_pos,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus)
+        if(negative_blocks>0):
+            update_tn_tp_256nodes[negative_blocks,32](index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
     #else2:
+
+    if(positive_blocks>0):
+        comapct_indexes[1,32](index_sizes_dev_pos,index_to_compact_pos,index_e_plus_dev,positive_blocks,index_sizes_dev,0)
+    if(negative_blocks>0):
+        comapct_indexes[1,32](index_sizes_dev_neg,index_to_compact_neg,index_e_minus_dev,negative_blocks,index_sizes_dev,1)
+    
     host_counts = index_sizes_dev.copy_to_host()
 
     size_plus = int(host_counts[0])
     size_minus = int(host_counts[1])
-    #print("plus to keep: ", size_plus)
-    #print("-minus to keep: ", size_minus)
+    if(positive_blocks==0):
+        size_plus=0
+    if(negative_blocks==0):
+        size_minus=0
     return size_plus,size_minus
 
 def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
@@ -327,10 +336,7 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
     # Negative literals (any must NOT hold)
     if len(item[2]) > 0:
         for sub in item[2]:
-            
             if evaluate_(sub, dataset_example, categorical_cols,flag,that): 
-                
-                
                 return False
           
     return 1
@@ -370,8 +376,8 @@ def learn_rule_(embedded_data_original,  index_e_plus,       index_e_minus,     
         #gets rows
 
         
-
-        if(len(index_e_plus)+len(index_e_minus)>5000): #remove
+        overall_els_no=len(index_e_plus)+len(index_e_minus)
+        if(overall_els_no>5000): #remove and overall_els_no<15000
             n_valid_plus,n_valid_minus=cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev)
             
 
@@ -385,11 +391,43 @@ def learn_rule_(embedded_data_original,  index_e_plus,       index_e_minus,     
                 index_e_minus = index_e_minus_dev[:n_valid_minus].copy_to_host().tolist()
             else:
                 index_e_minus=[]
+        
         else:
             index_e_plus = [i for i in index_e_plus if cover_(rule, embedded_data_original, i,categorical_cols)]
             index_e_minus = [i for i in index_e_minus  if cover_(rule, embedded_data_original, i,categorical_cols)]
         
+        '''
+        elif(overall_els_no>=15000):
 
+
+
+            index_e_plus_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
+            e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
+            
+            #e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
+            #e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
+            
+            #print("rule -> ", rule)
+            flatRule = FlatState.from_root(rule)
+            #print("rule: ",rule)                            
+            #print("flatRule: ",flatRule)
+            n_valid_plus,n_valid_minus=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev, index_sizes_dev_pos_dev,index_to_compact_pos_dev,index_sizes_dev_neg_dev,index_to_compact_neg_dev)
+            
+            #print("valid tp:",n_valid_tp)
+
+            # 2. Taglia l'array direttamente sulla GPU (lo slicing in Numba non copia dati)
+            # e POI copia solo la parte utile sull'host
+            if(n_valid_plus>0):
+                index_e_plus = index_e_plus_dev[:n_valid_plus].copy_to_host().tolist()
+            else:
+                index_e_plus=[]
+            if(n_valid_minus>0):
+                index_e_minus = index_e_minus_dev[:n_valid_minus].copy_to_host().tolist()
+            else:
+                index_e_minus=[]
+
+
+        '''
         end_cover_pos_neg = timer()
         overall_covers += end_cover_pos_neg - start_cover_pos_neg
 
