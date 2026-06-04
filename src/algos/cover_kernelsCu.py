@@ -192,6 +192,48 @@ def update_tn_tp_256nodes(index_sizes_block,index_to_compact,nodes_dev, literals
         index_sizes_block[cuda.blockIdx.x]=total_found
 
 
+@cuda.jit
+def update_tn_tp(stack,rule_len,index_sizes_block,index_to_compact,nodes_dev, literals_dev,edges_dev, embedded_data_original, categorical_cols,index,len_index):
+    tid = cuda.threadIdx.x
+    bid=cuda.blockIdx.x*128
+    total_found = 0
+    for chunk_start in range(0, 128, 32): # loops
+        pos_in_list = chunk_start + tid + bid
+        mask = 0xffffffff
+        active = pos_in_list < len_index
+        #which threads didn't pass the index len
+        active_mask = cuda.ballot_sync(mask, active)
+        # Load value or placeholder
+        remove = -1
+        i=-1
+        if active:
+            remove=0
+            i=index[pos_in_list]
+            covered=evaluate_dev_full_rule(stack,rule_len,nodes_dev, literals_dev,edges_dev, embedded_data_original[i],categorical_cols)
+            if(covered):
+                remove=1
+
+               
+        ballot = cuda.ballot_sync(active_mask, remove==0) #conto quelli da tenere
+        #print("ballot to keep", ballot)
+        lower_mask = (1 << tid) - 1
+        
+        dest_idx = total_found + cuda.popc(ballot & lower_mask)
+        cuda.syncwarp()
+        
+        #dest_idx = total_found + cuda.popc(ballot & lower_mask)
+        
+        if(remove==0): #keep
+            #devo salvarmi "i"
+            index_to_compact[bid+dest_idx]=i
+
+        total_found += cuda.popc(ballot)
+        cuda.syncwarp() # remove(?)
+
+
+
+    if(tid==0):
+        index_sizes_block[cuda.blockIdx.x]=total_found
 
 
 @cuda.jit(device=True)
@@ -205,9 +247,6 @@ def evaluate_dev_full_rule_128nodes(nodes, literals,edges, dataset_example, cate
     
     stack_evals = cuda.local.array(128, dtype=int16)  
 
-    #if(nodes_no>128):
-    #    print("ISSUE WITH THE NUMBER OF NODES! ")
-
     #start from ending noeds which are single parts
     for node_idx in range(len(nodes) - 1, -1, -1):
         _, node_start, node_len = nodes[node_idx]
@@ -215,7 +254,6 @@ def evaluate_dev_full_rule_128nodes(nodes, literals,edges, dataset_example, cate
         falsified_by_children=False
 
         for edge in range(edges.shape[0]):
-            #print("checking children")
             if edges[edge,0] == node_idx:
                 child_index = edges[edge,1]
                 child_val=stack_evals[child_index]
@@ -224,7 +262,6 @@ def evaluate_dev_full_rule_128nodes(nodes, literals,edges, dataset_example, cate
                 
         for el in range (node_start, node_start+node_len):
                 
-            #evaluate positive vals
             i,r,v=literals[el]
             i=int(i)
             r=int(r)
@@ -232,8 +269,6 @@ def evaluate_dev_full_rule_128nodes(nodes, literals,edges, dataset_example, cate
             
             
             if(not falsified_by_children): #i eval only if children didn't already falsified me 
-                #if(flag==1):
-                #    print("th:", cuda.threadIdx.x,"col ",i, "falsified_by_children: ", falsified_by_children)
                 val = dataset_example[i]
                         
                 is_categorical = False
@@ -272,9 +307,6 @@ def evaluate_dev_full_rule_256nodes(nodes, literals,edges, dataset_example, cate
     
     stack_evals = cuda.local.array(256, dtype=int16)  
 
-    nodes_no=len(nodes)
-    if(nodes_no>256):
-        print("ISSUE WITH THE NUMBER OF NODES! ")
 
     #start from ending noeds which are single parts
     for node_idx in range(len(nodes) - 1, -1, -1):
@@ -283,7 +315,6 @@ def evaluate_dev_full_rule_256nodes(nodes, literals,edges, dataset_example, cate
         falsified_by_children=False
 
         for edge in range(edges.shape[0]):
-            #print("checking children")
             if edges[edge,0] == node_idx:
                 child_index = edges[edge,1]
                 child_val=stack_evals[child_index]
@@ -297,6 +328,68 @@ def evaluate_dev_full_rule_256nodes(nodes, literals,edges, dataset_example, cate
             i=int(i)
             r=int(r)
             
+            #falsified_by_children TRUE <=> all children are true or NO CHILDREN
+            
+            
+            if(not falsified_by_children): #i eval only if children didn't already falsified me 
+                val = dataset_example[i]
+                        
+                is_categorical = False
+                for c_idx in range(len(categorical_cols)):
+                    if categorical_cols[c_idx] == i:
+                        is_categorical = True
+                        break
+                
+                if is_categorical:
+                    if r == 2:
+                        cond &= val == v
+                    elif r == 3:
+                        cond &= val != v
+                else:
+                    if r == 0:
+                        cond &= val <= v
+                    elif r == 1:
+                        cond &= val > v
+            else:
+                cond=False
+
+            
+            stack_evals[node_idx]=cond #eval node
+   
+    return stack_evals[0]
+
+
+
+@cuda.jit(device=True)
+def evaluate_dev_full_rule(stack_evals,rule_len, nodes, literals,edges, dataset_example, categorical_cols):
+
+    N = len(literals)
+
+    #empty rule
+    if(N == 0):
+        return False
+    
+    base_offset=(cuda.blockIdx.x * 32 + cuda.threadIdx.x) * rule_len
+    #start from ending noeds which are single parts
+    for node_idx in range(len(nodes) - 1, -1, -1):
+        _, node_start, node_len = nodes[node_idx]
+        cond=True
+        falsified_by_children=False
+
+        for edge in range(edges.shape[0]):
+            #print("checking children")
+            if edges[edge,0] == node_idx:
+                child_index = edges[edge,1]
+                child_val=stack_evals[base_offset+child_index]
+                falsified_by_children |= child_val
+
+                
+        for el in range (node_start, node_start+node_len):
+                
+            #evaluate positive vals
+            i,r,v=literals[el]
+            i=int(i)
+            r=int(r)
             #falsified_by_children TRUE <=> all children are true or NO CHILDREN
             
             
@@ -325,10 +418,11 @@ def evaluate_dev_full_rule_256nodes(nodes, literals,edges, dataset_example, cate
                 cond=False
 
             
-            stack_evals[node_idx]=cond #eval node
+            stack_evals[base_offset+node_idx]=cond #eval node
    
-    return stack_evals[0]
+    return stack_evals[base_offset]
   
+
 @cuda.jit
 def print_dev(index_e_plus_dev,size_plus):
     for i in range(size_plus):

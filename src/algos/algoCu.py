@@ -247,12 +247,21 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
             update_tn_tp_128nodes[positive_blocks,32](index_sizes_dev_pos,index_to_compact_pos,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus)
         if(negative_blocks>0):
             update_tn_tp_128nodes[negative_blocks,32](index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
-    else:
+    elif(len(rule.nodes)<256):
         if(positive_blocks>0):
             update_tn_tp_256nodes[positive_blocks,32](index_sizes_dev_pos,index_to_compact_pos,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus)
         if(negative_blocks>0):
             update_tn_tp_256nodes[negative_blocks,32](index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
-    #else2:
+    #too many nodes allocate data first
+    else:
+        stack_tp = cuda.device_array(positive_blocks * 32 * len(rule.nodes), dtype=np.int16)
+        stack_tn = cuda.device_array(negative_blocks * 32 * len(rule.nodes), dtype=np.int16)
+        if(positive_blocks>0):
+            update_tn_tp[positive_blocks,32](stack_tp,len(rule.nodes),index_sizes_dev_pos,index_to_compact_pos,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus)
+        if(negative_blocks>0):
+            update_tn_tp[negative_blocks,32](stack_tn,len(rule.nodes),index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
+
+        
 
     if(positive_blocks>0):
         comapct_indexes[1,32](index_sizes_dev_pos,index_to_compact_pos,index_e_plus_dev,positive_blocks,index_sizes_dev,0)
@@ -260,9 +269,10 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
         comapct_indexes[1,32](index_sizes_dev_neg,index_to_compact_neg,index_e_minus_dev,negative_blocks,index_sizes_dev,1)
     
     host_counts = index_sizes_dev.copy_to_host()
-
     size_plus = int(host_counts[0])
     size_minus = int(host_counts[1])
+
+
     if(positive_blocks==0):
         size_plus=0
     if(negative_blocks==0):

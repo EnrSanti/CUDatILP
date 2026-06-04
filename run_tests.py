@@ -151,9 +151,17 @@ datasets_split = {
     "MNIST": (MNIST,"MNIST",0.5)}
 datasets_to_split = {
     "jannis": (jannis,"jannis",0.8,0.2),
-    "smoke_drink": (smoke_drink,"smoke_drink",0.7,0.4)
+    "MiniBooNE": (MiniBooNE,"MiniBooNE",0.8,0.2),
+    "human_activity": (human_activity,"human_activity",0.9,0.3),
+    "lifestyle": (lifestyle,"lifestyle",0.8,0.2),
+    "sloan": (sloan,"sloan",0.9,0.3),
+    "diabetes": (diabetes,"diabetes",0.8,0.25),
+    "smoke_drink": (smoke_drink,"smoke_drink",0.7,0.4),
+    "covertype": (coverType,"covertype",0.8,0.2),
+    "crops": (crops,"crops",0.8,0.3),
+    "nepal_earthquake": (nepal_earthquake,"nepal_earthquake",0.7,0.3),
+    "weather": (weather,"weather",0.8,0.25)
     }
-    
 
 
 def compare_times():
@@ -170,7 +178,7 @@ def compare_times():
     
 
 
-    n_runs = 5
+    n_runs = 1
     errors = 0
 
     serial_times_all = [[] for _ in benchmark_tasks]
