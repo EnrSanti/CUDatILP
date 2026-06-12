@@ -170,10 +170,18 @@ def compare_times():
 
     
 
+    # --- split datasets ---
     for name, (fn, pretty_name, ds_ratio, fit_ratio) in datasets_to_split.items():
         benchmark_tasks.append(
             (run_test_to_split_ds, fn, pretty_name, fit_ratio,ds_ratio)
         )
+
+    # --- no split datasets ---
+    for name, (fn, pretty_name, ratio) in datasets_split.items():
+        benchmark_tasks.append(
+            (run_test_split, fn, pretty_name, ratio, None)
+        )
+
 
     
 
@@ -393,10 +401,10 @@ def fast_check():
         if h_cpu != h_gpu:
             if(accuracy_cpu == accuracy_gpu):
                 print(f"{YELLOW}OK WORKS (!= hyp = accuracy){RESET}")
-                print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
+                #print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
             else:
                 print(f"{RED}test1 failed{RESET}")
-                print(h_cpu+"\n-----------------------------------\n"+h_gpu)
+                #print(h_cpu+"\n-----------------------------------\n"+h_gpu)
                 test_failed+=1
         elif(accuracy_cpu != accuracy_gpu):
             print(f"{RED}ACCURACY DIFFERENCE(?){RESET}")
@@ -416,11 +424,25 @@ def fast_check():
         print(f"{RED}{test_failed}-------------------\nTEST FAILED\n-------------------{RESET}")
 
 
+def bg_comparison():
+    model, data = sudoku()
+    data_train, data_test = split_data(data, ratio=0.8)
+
+    start = timer()
+    model.fitGPU(data_train, ratio=0.5)
+    end = timer()
+    
+    model.print_asp(simple=True)
+    Y = [d[-1] for d in data_test]
+    Y_test_hat = model.predict(data_test)
+    acc = get_scores(Y_test_hat, data_test)
+    print('% acc', round(acc, 4), '# rules', len(model.crs))
 
 def main():
     
-    fast_check()
-    compare_times()
+    #fast_check()
+    #compare_times()
+    bg_comparison()
 
 if __name__ == '__main__':
     main()

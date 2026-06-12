@@ -119,7 +119,7 @@ def CUDatILP(data, ratio=0.5):
         overall_learn += end_learn - start_learn
         
         start_setop = timer()
-        if(len(index_e_plus)+len(index_e_minus)>5000 or True): #true for now, just to check
+        if(len(index_e_plus)+len(index_e_minus)>5000): #true for now, just to check
             
             e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
             e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
