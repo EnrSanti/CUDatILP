@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import re
 from collections import defaultdict
 
 import clingo
@@ -166,10 +167,48 @@ def check_stratified(predicates, pos_edges, neg_edges):
 # =====================================================================
 
 class RuleExtractor:
+    _CMP_OPS = {
+        ast.ComparisonOperator.LessThan: "<",
+        ast.ComparisonOperator.LessEqual: "<=",
+        ast.ComparisonOperator.GreaterThan: ">",
+        ast.ComparisonOperator.GreaterEqual: ">=",
+        ast.ComparisonOperator.Equal: "=",
+        ast.ComparisonOperator.NotEqual: "!=",
+    }
+    _BIN_OPS = {
+        ast.BinaryOperator.Plus: lambda a, b: a + b,
+        ast.BinaryOperator.Minus: lambda a, b: a - b,
+        ast.BinaryOperator.Multiplication: lambda a, b: a * b,
+        ast.BinaryOperator.Division: lambda a, b: a / b,
+        ast.BinaryOperator.Modulo: lambda a, b: a % b,
+        ast.BinaryOperator.Power: lambda a, b: a ** b,
+    }
+
+
     def __init__(self):
         self.facts = set()    # ground facts: set of (pred, *args)
         self.rules = []       # list of {"head": ..., "body": [...]}
 
+    def comparison_to_atom(self, lit, atom):
+
+        if lit.sign == ast.Sign.Negation:
+            raise ValueError(f"Unsupported negated comparison: {lit}")
+
+        guards = atom.guards
+
+        if len(guards) != 1:
+            raise ValueError(f"Unsupported chained comparison (multiple guards): {lit}")
+
+        guard = guards[0]
+        op = guard.comparison
+
+        if op not in self._CMP_OPS:
+            raise ValueError(f"Unsupported comparison operator {op!r}: {lit}")
+
+        left = self.term_to_value(atom.term)
+        right = self.term_to_value(guard.term)
+
+        return ("cmp", self._CMP_OPS[op], (left, right))
     def term_to_value(self, term):
         """Convert a clingo AST term into a Python value or var-name string."""
 
@@ -206,19 +245,42 @@ class RuleExtractor:
 
     def literal_to_atom(self, lit):
         """
-        Convert a Literal (SymbolicAtom) into (sign, pred, args_tuple).
-        Returns None for non-symbolic atoms (comparisons, aggregates, ...).
+        Convert a Literal into one of:
+          ("pos"/"neg", pred, args_tuple)   -- symbolic atom
+          ("cmp", op, (left, right))        -- comparison, op in
+                                                {"<","<=",">",">=","=","!="}
+
+        Raises a precise ValueError for any other unsupported literal kind.
         """
 
         atom = lit.atom
+        t = atom.ast_type
 
-        if atom.ast_type != ast.ASTType.SymbolicAtom:
-            return None
+        if t == ast.ASTType.Comparison:
+            return self.comparison_to_atom(lit, atom)
+
+        if t == ast.ASTType.BodyAggregate:
+            raise ValueError(f"Unsupported body aggregate (#count/#sum/...): {lit}")
+
+        if t == ast.ASTType.Aggregate:
+            raise ValueError(f"Unsupported aggregate: {lit}")
+
+        if t == ast.ASTType.TheoryAtom:
+            raise ValueError(f"Unsupported theory atom: {lit}")
+
+        if t == ast.ASTType.BooleanConstant:
+            raise ValueError(f"Unsupported boolean constant (#true/#false): {lit}")
+
+        if t != ast.ASTType.SymbolicAtom:
+            raise ValueError(f"Unsupported atom type {t!r}: {lit}")
 
         sym = atom.symbol
 
+        if sym.ast_type == ast.ASTType.Pool:
+            raise ValueError(f"Unsupported pooled atom (e.g. p(1;2)): {lit}")
+
         if sym.ast_type != ast.ASTType.Function:
-            return None
+            raise ValueError(f"Unsupported symbolic term type {sym.ast_type!r} in atom: {lit}")
 
         pred = sym.name
         args = tuple(self.term_to_value(a) for a in sym.arguments)
@@ -230,8 +292,9 @@ class RuleExtractor:
     def visit_rule(self, rule):
 
         head = rule.head
-
+        
         if head.ast_type != ast.ASTType.Literal:
+            print("aggregate in head")
             # disjunctions / aggregates in head not supported here
             return
 
@@ -247,8 +310,10 @@ class RuleExtractor:
 
         body = []
 
+        #parse all body atoms
         for lit in rule.body:
             atom = self.literal_to_atom(lit)
+            print(atom)
             if atom is None:
                 raise ValueError(
                     "Unsupported body literal (comparison/aggregate/theory atom); "
@@ -301,9 +366,21 @@ def match_atom(pattern_args, fact_args, subst):
 
     return new_subst
 
+import operator
+
+_CMP_FUNCS = {
+    "<": operator.lt,
+    "<=": operator.le,
+    ">": operator.gt,
+    ">=": operator.ge,
+    "=": operator.eq,
+    "!=": operator.ne,
+}
+
 
 def solve_body(body, facts):
     pos = [b for b in body if b[0] == "pos"]
+    cmp = [b for b in body if b[0] == "cmp"]
     neg = [b for b in body if b[0] == "neg"]
 
     def rec(lits, subst):
@@ -326,8 +403,25 @@ def solve_body(body, facts):
                 yield from rec(rest, new_subst)
 
     for subst1 in rec(pos, {}):
+
+        # check comparisons (must be ground by now)
         ok = True
 
+        for _, op, (left, right) in cmp:
+            lval = resolve(left, subst1)
+            rval = resolve(right, subst1)
+
+            if is_var(lval) or is_var(rval):
+                raise ValueError(f"Unbound variable in comparison: {left} {op} {right}")
+
+            if not _CMP_FUNCS[op](lval, rval):
+                ok = False
+                break
+
+        if not ok:
+            continue
+
+        # check negated literals
         for sign, pred, args in neg:
             ground_args = apply_subst(args, subst1)
 
@@ -415,11 +509,14 @@ def compute_strata(predicates, pos_edges, neg_edges, sccs):
 
 
 def evaluate(rules, facts, pred_stratum):
+
+    # no more layers
     if not pred_stratum:
         return fixpoint(rules, facts)
 
     max_stratum = max(pred_stratum.values())
 
+    # compute fixpoint at each layer
     for s in range(max_stratum + 1):
         rules_in_stratum = [
             r for r in rules if pred_stratum.get(r["head"][0], 0) == s
@@ -428,25 +525,111 @@ def evaluate(rules, facts, pred_stratum):
 
     return facts
 
+def resolve(val, subst):
+    if is_var(val):
+        return subst.get(val, val)
+    return val
 
 # =====================================================================
 # 4. Driver
 # =====================================================================
 
-def parse_file(filename):
+def parse_file(filename_content):
 
     dep = DependencyExtractor()
     rex = RuleExtractor()
 
     def on_statement(stmt):
         if stmt.ast_type == ast.ASTType.Rule:
+            print(stmt)
             dep.visit_rule(stmt)
             rex.visit_rule(stmt)
-
-    ast.parse_files([filename], on_statement)
+        else:
+            print("non rule"+str(stmt))
+    ast.parse_string(filename_content, on_statement)
 
     return dep, rex
 
+
+
+
+def preprocess_floats(filename):
+
+
+    """
+    Read `filename`, find every float literal (e.g. 36.6, -2.5, 0.001),
+    and replace each *distinct* value with a unique placeholder constant
+    of the form "<base>_n" (n = 1, 2, 3, ...), where <base> is
+    "_float_placeholder" or, if that string already occurs in the file,
+    a version prefixed with extra underscores until it's unique.
+
+    Occurrences of the same float value are mapped to the same
+    placeholder. String literals ("...") are left untouched (floats
+    inside quotes are not replaced).
+
+    Returns:
+        patched_text   : the file content with floats replaced
+        value_to_name  : dict float_value -> placeholder name (str)
+        name_to_value  : dict placeholder name -> float_value (reverse map)
+    """
+    
+    FLOAT_RE = re.compile(r'(?<![\w.])(-?\d+\.\d+)(?![\w.])')
+    STRING_RE = re.compile(r'"(?:\\.|[^"\\])*"')
+    
+    def find_free_placeholder_base(text):
+        """
+        Find a placeholder base name "_float_placeholder" (possibly prefixed
+        with extra underscores) that does not occur anywhere in `text`.
+        """
+
+        base = "_float_placeholder"
+
+        while base in text:
+            base = "_" + base
+
+        return base
+    with open(filename, "r", encoding="utf-8") as f:
+        text = f.read()
+
+    base = find_free_placeholder_base(text)
+
+    value_to_name = {}
+    name_to_value = {}
+    counter = [0]
+
+    def repl_float(m):
+        val = float(m.group(1))
+
+        if val not in value_to_name:
+            counter[0] += 1
+            name = f"{base}_{counter[0]}"
+            value_to_name[val] = name
+            name_to_value[name] = val
+
+        return value_to_name[val]
+
+    def repl_segment(segment):
+        # segment is guaranteed to contain no quoted strings
+        return FLOAT_RE.sub(repl_float, segment)
+
+    # Split the text into alternating non-string / string segments so
+    # floats inside "..." are left untouched.
+    pieces = []
+    last_end = 0
+
+    for m in STRING_RE.finditer(text):
+        # text before this string literal: replace floats
+        pieces.append(repl_segment(text[last_end:m.start()]))
+        # the string literal itself: keep as-is
+        pieces.append(m.group(0))
+        last_end = m.end()
+
+    # trailing piece after the last string literal
+    pieces.append(repl_segment(text[last_end:]))
+
+    patched_text = "".join(pieces)
+
+    return patched_text, value_to_name, name_to_value
 
 def main():
 
@@ -456,13 +639,18 @@ def main():
 
     filename = sys.argv[1]
 
+    preprocessed_file,map_float_str,map_str_float= preprocess_floats(filename)
+    print(preprocessed_file)
+    print(map_float_str)
+    print(map_str_float)
+
     try:
-        dep, rex = parse_file(filename)
+        dep, rex = parse_file(preprocessed_file)
     except RuntimeError as e:
         print("Parse error:")
         print(e)
         sys.exit(1)
-
+    
     stratified, sccs, violating = check_stratified(
         dep.predicates, dep.pos_edges, dep.neg_edges
     )
@@ -473,19 +661,14 @@ def main():
             print(f"  {u} -|> {v}")
         sys.exit(1)
 
-    print("Program is stratified. SCCs:")
-    for scc in sccs:
-        print(" ", scc)
+    print("Program is stratified.")
 
     pred_stratum = compute_strata(dep.predicates, dep.pos_edges, dep.neg_edges, sccs)
-
-    print("\nStrata:")
-    for p in sorted(pred_stratum, key=lambda p: (pred_stratum[p], p)):
-        print(f"  {pred_stratum[p]}: {p}")
 
     answer_set = evaluate(rex.rules, rex.facts, pred_stratum)
 
     print("\nAnswer set:")
+
     for f in sorted(answer_set, key=lambda x: (x[0], x[1:])):
         pred = f[0]
         args = f[1:]
