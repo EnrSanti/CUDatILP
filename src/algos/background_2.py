@@ -16,7 +16,119 @@ VAR_RE = re.compile(r"^[A-Z_]")
 def is_var(t):
     return isinstance(t, str) and bool(VAR_RE.match(t))
 
+STEP_RE = re.compile(
+    r'([a-z_][A-Za-z0-9_]*)\s*\(([^()]*)\)\s*:\s*(-?\d+(?:\.\d+)?)\s*\.'
+)
 
+ARG_INTERVAL_RE = re.compile(
+    r'^\s*(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)\s*$'
+)
+
+ARG_POOL_RE = re.compile(r'^\s*(-?\d+(?:\.\d+)?(?:\s*;\s*-?\d+(?:\.\d+)?)+)\s*$')
+
+
+def split_top_level_commas(s):
+    """Split `s` on commas that aren't nested inside parens (none expected
+    here since the outer regex already excludes '(' ')', but kept for
+    safety/clarity)."""
+    return [part.strip() for part in s.split(",")]
+
+
+STEP_RE = re.compile(
+    r'([a-z_][A-Za-z0-9_]*)\s*\(([^()]*)\)\s*:\s*(-?\d+(?:\.\d+)?)\s*\.'
+)
+
+ARG_INTERVAL_RE = re.compile(
+    r'^\s*(-?\d+(?:\.\d+)?)\s*\.\.\s*(-?\d+(?:\.\d+)?)\s*$'
+)
+
+
+def expand_stepped_intervals(text):
+    """
+    Detect and remove statements of the form:
+        name(arg1, arg2, ...):step.
+
+    Matches clingo's actual pooling semantics: ';' at the top level of
+    the argument list pools whole argument-TUPLES (not individual
+    argument slots), e.g.
+
+        var2(1..6,10;11)
+
+    means: pool of two alternative tuples, (1..6, 10) and (11,) -- NOT
+    a cartesian product across all of "1..6", "10", "11" together.
+
+    Within EACH ';'-separated alternative, arguments are split on ','
+    and combined via cartesian product as usual (intervals expand to
+    a value-list, stepped by `step` if numeric/float; plain numbers
+    stay fixed).
+
+    Returns (patched_text, stepped) where stepped is a list of
+    (pred, [tuple1, tuple2, ...]) -- the concatenation (NOT product)
+    of facts from each ';'-alternative.
+    """
+
+    stepped = []
+
+    def expand_one_arg(arg_text, step):
+        m_interval = ARG_INTERVAL_RE.match(arg_text)
+
+        if m_interval:
+            a = float(m_interval.group(1))
+            b = float(m_interval.group(2))
+
+            if step == 0:
+                raise ValueError(f"Step cannot be zero in interval: {arg_text}")
+
+            n_steps = round((b - a) / step)
+
+            if n_steps < 0:
+                raise ValueError(f"Empty stepped interval (b < a?): {arg_text}")
+
+            values = []
+            for i in range(n_steps + 1):
+                v = round(a + i * step, 10)
+                if float(v).is_integer():
+                    v = int(v)
+                values.append(v)
+
+            return values
+
+        # plain number (pools are now split out before this is called)
+        try:
+            v = float(arg_text.strip())
+            if v.is_integer():
+                v = int(v)
+            return [v]
+        except ValueError:
+            return [arg_text.strip()]
+
+    def repl(m):
+        pred = m.group(1)
+        args_blob = m.group(2)
+        step = float(m.group(3))
+
+        # Step 1: split into ';'-separated whole-tuple alternatives
+        alternatives = [alt.strip() for alt in args_blob.split(";")]
+
+        all_tuples = []
+
+        for alt in alternatives:
+            # Step 2: within this alternative, split on top-level commas
+            arg_texts = [a.strip() for a in alt.split(",")] if alt else []
+
+            per_arg_values = [expand_one_arg(a, step) for a in arg_texts]
+
+            # Step 3: cartesian product WITHIN this alternative only
+            for combo in itertools.product(*per_arg_values):
+                all_tuples.append(combo)
+
+        stepped.append((pred, all_tuples))
+
+        return ""
+
+    patched = STEP_RE.sub(repl, text)
+
+    return patched, stepped
 # =====================================================================
 # 1. Dependency extraction / stratification check
 # =====================================================================
@@ -898,7 +1010,15 @@ def main():
 
     filename = sys.argv[1]
 
-    preprocessed_file, _, map_str_float = preprocess_floats(filename)
+    with open(filename, "r", encoding="utf-8") as f:
+        raw_text = f.read()
+    text_without_steps, stepped_facts = expand_stepped_intervals(raw_text)
+
+    with open(filename + ".__tmp_stepped__", "w", encoding="utf-8") as f:
+        f.write(text_without_steps)
+
+    preprocessed_file, _, map_str_float = preprocess_floats(filename + ".__tmp_stepped__")
+
     print(preprocessed_file)
     print(map_str_float)
 
@@ -911,6 +1031,12 @@ def main():
     except ValueError as e:
         print(f"Background error: {e}")
         sys.exit(1)
+
+    # inject the stepped-interval facts directly
+    for pred, tuples in stepped_facts:
+        dep.predicates.add(pred)
+        for t in tuples:
+            rex.facts.add((pred,) + t)
 
     stratified, sccs, violating = check_stratified(
         dep.predicates, dep.pos_edges, dep.neg_edges
