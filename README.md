@@ -1,6 +1,6 @@
 # CUD@ILP
 
-CUD@ILP is a CUDA-accelerated extension of the FOLD-RM algorithm for binary classification tasks.
+CUD@ILP is a CUDA-accelerated extension of the FOLD-RM algorithm for binary and multiclass classification tasks.
 
 The project is based on FOLD-RM (https://github.com/hwd404/FOLD-RM), an Inductive Logic Programming (ILP) framework that learns default theories represented as Answer Set Programs (ASP). ASP is a declarative logic programming paradigm that supports negation and is interpreted under stable model semantics.
 
@@ -14,7 +14,7 @@ This branch extends the original FOLD-RM implementation with GPU acceleration an
 This branch contains the version described in the paper **CUD@ILP: a GPU-based Massively Scalable Inductive
 Learning Algorithm**
 
-**Average Speedup with respect to FOLD-RM: 12×**
+**Average Speedup with respect to FOLD-RM: 13×**
 
 ---
 
