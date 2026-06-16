@@ -2,10 +2,19 @@
 
 import sys
 import re
+import operator
+import itertools
 from collections import defaultdict
 
 import clingo
 import clingo.ast as ast
+
+
+VAR_RE = re.compile(r"^[A-Z_]")
+
+
+def is_var(t):
+    return isinstance(t, str) and bool(VAR_RE.match(t))
 
 
 # =====================================================================
@@ -154,16 +163,25 @@ def check_stratified(predicates, pos_edges, neg_edges):
 # 2. AST -> evaluator rule format
 #
 #    Converts clingo terms into Python values:
-#      - Variable                    -> str (variable name, e.g. "X")
-#      - SymbolicTerm / Number        -> int
-#      - SymbolicTerm / String        -> str
-#      - SymbolicTerm / Function, 0-ary -> str (constant name)
-#      - UnaryOperation (Minus)       -> negated number
+#      - Variable                       -> str (variable name, e.g. "X")
+#      - SymbolicTerm / Number          -> int
+#      - SymbolicTerm / String          -> str
+#      - SymbolicTerm / Function, 0-ary -> str (constant name), or
+#                                           resolved value if it's a
+#                                           known float-placeholder /
+#                                           user-defined constant
+#      - UnaryOperation (Minus)         -> negated number
+#      - BinaryOperation                -> evaluated number, or a
+#                                           deferred ("expr", op, l, r)
+#                                           tuple if it depends on a
+#                                           runtime variable binding
+#      - Interval (a..b)                -> ("multi", [a, a+1, ..., b])
+#      - Pool (a;b;c)                   -> ("multi", [a, b, c])
 #
 #    Only handles: SymbolicAtom over Function terms, with arguments
-#    that are themselves Symbols (numbers/strings/constants) or
-#    Variables. No aggregates, no pooling, no binary arithmetic,
-#    no disjunction in the head.
+#    that are themselves Symbols (numbers/strings/constants),
+#    Variables, arithmetic expressions, intervals, or pools.
+#    No aggregates, no disjunction in the head.
 # =====================================================================
 
 class RuleExtractor:
@@ -184,10 +202,100 @@ class RuleExtractor:
         ast.BinaryOperator.Power: lambda a, b: a ** b,
     }
 
-
-    def __init__(self):
+    def __init__(self, name_to_value=None):
         self.facts = set()    # ground facts: set of (pred, *args)
         self.rules = []       # list of {"head": ..., "body": [...]}
+        self.name_to_value = name_to_value or {}
+        self.constants = {}
+
+    # -----------------------------------------------------------------
+    # term conversion
+    # -----------------------------------------------------------------
+
+    def term_to_value(self, term):
+        """Convert a clingo AST term into a Python value, var-name string,
+        deferred ("expr", ...) tuple, or multi-valued ("multi", [...]) tuple."""
+
+        t = term.ast_type
+
+        if t == ast.ASTType.Variable:
+            return term.name
+
+        if t == ast.ASTType.SymbolicTerm:
+            sym = term.symbol
+
+            if sym.type == clingo.SymbolType.Number:
+                return sym.number
+
+            if sym.type == clingo.SymbolType.String:
+                return sym.string
+
+            if sym.type == clingo.SymbolType.Function:
+                if len(sym.arguments) == 0:
+                    if sym.name in self.name_to_value:
+                        return self.name_to_value[sym.name]
+                    if sym.name in self.constants:
+                        return self.constants[sym.name]
+                    return sym.name
+                raise ValueError(f"Nested function terms not supported: {sym}")
+
+            raise ValueError(f"Unsupported symbol type: {sym.type}")
+
+        if t == ast.ASTType.UnaryOperation:
+            inner = self.term_to_value(term.argument)
+            if term.operator_type == ast.UnaryOperator.Minus and isinstance(inner, (int, float)):
+                return -inner
+            raise ValueError(f"Unsupported unary operation: {term}")
+
+        if t == ast.ASTType.BinaryOperation:
+            op = term.operator_type
+
+            if op not in self._BIN_OPS:
+                raise ValueError(f"Unsupported binary operator {op!r}: {term}")
+
+            left = self.term_to_value(term.left)
+            right = self.term_to_value(term.right)
+
+            if is_var(left) or is_var(right):
+                # depends on a runtime binding -> defer to evaluation
+                return ("expr", op, left, right)
+
+            try:
+                return self._BIN_OPS[op](left, right)
+            except ZeroDivisionError:
+                raise ValueError(f"Division by zero in: {term}")
+
+        if t == ast.ASTType.Interval:
+            left = self.term_to_value(term.left)
+            right = self.term_to_value(term.right)
+
+            if is_var(left) or is_var(right):
+                raise ValueError(
+                    f"Interval with unbound variable not supported here: {term}"
+                )
+
+            if not isinstance(left, int) or not isinstance(right, int):
+                raise ValueError(f"Interval bounds must be integers: {term}")
+
+            return ("multi", list(range(left, right + 1)))
+
+        if t == ast.ASTType.Pool:
+            values = [self.term_to_value(arg) for arg in term.arguments]
+
+            flat = []
+            for v in values:
+                if isinstance(v, tuple) and len(v) == 2 and v[0] == "multi":
+                    flat.extend(v[1])
+                else:
+                    flat.append(v)
+
+            return ("multi", flat)
+
+        raise ValueError(f"Unsupported term type: {t!r} (term: {term!r})")
+
+    # -----------------------------------------------------------------
+    # comparisons
+    # -----------------------------------------------------------------
 
     def comparison_to_atom(self, lit, atom):
 
@@ -209,39 +317,10 @@ class RuleExtractor:
         right = self.term_to_value(guard.term)
 
         return ("cmp", self._CMP_OPS[op], (left, right))
-    def term_to_value(self, term):
-        """Convert a clingo AST term into a Python value or var-name string."""
 
-        t = term.ast_type
-
-        if t == ast.ASTType.Variable:
-            return term.name
-
-        if t == ast.ASTType.SymbolicTerm:
-            sym = term.symbol
-
-            if sym.type == clingo.SymbolType.Number:
-                return sym.number
-
-            if sym.type == clingo.SymbolType.String:
-                return sym.string
-
-            if sym.type == clingo.SymbolType.Function:
-                if len(sym.arguments) == 0:
-                    return sym.name
-                raise ValueError(
-                    f"Nested function terms not supported: {sym}"
-                )
-
-            raise ValueError(f"Unsupported symbol type: {sym.type}")
-
-        if t == ast.ASTType.UnaryOperation:
-            inner = self.term_to_value(term.argument)
-            if term.operator_type == ast.UnaryOperator.Minus and isinstance(inner, (int, float)):
-                return -inner
-            raise ValueError(f"Unsupported unary operation: {term}")
-
-        raise ValueError(f"Unsupported term type: {t!r} (term: {term!r})")
+    # -----------------------------------------------------------------
+    # literals
+    # -----------------------------------------------------------------
 
     def literal_to_atom(self, lit):
         """
@@ -285,23 +364,117 @@ class RuleExtractor:
         pred = sym.name
         args = tuple(self.term_to_value(a) for a in sym.arguments)
 
+       
+
         sign = "neg" if lit.sign == ast.Sign.Negation else "pos"
 
         return sign, pred, args
 
-    def visit_rule(self, rule):
+    # -----------------------------------------------------------------
+    # constant definitions ("name = value.")
+    # -----------------------------------------------------------------
+
+    def is_constant_definition(self, rule):
+        """
+        Detect (without resolving constants) whether `rule` has the
+        raw syntactic shape 'name = value.' or 'value = name.':
+        a ground, non-negated Comparison head with a single '=' guard,
+        no body, where one side is a bare 0-ary Function symbol.
+        """
 
         head = rule.head
-        
+
+        if head.ast_type != ast.ASTType.Literal or rule.body:
+            return False
+
+        if head.sign == ast.Sign.Negation:
+            return False
+
+        atom = head.atom
+
+        if atom.ast_type != ast.ASTType.Comparison:
+            return False
+
+        guards = atom.guards
+        if len(guards) != 1 or guards[0].comparison != ast.ComparisonOperator.Equal:
+            return False
+
+        def is_bare_constant_symbol(term):
+            return (
+                term.ast_type == ast.ASTType.SymbolicTerm
+                and term.symbol.type == clingo.SymbolType.Function
+                and len(term.symbol.arguments) == 0
+            )
+
+        left_term = atom.term
+        right_term = guards[0].term
+
+        return is_bare_constant_symbol(left_term) or is_bare_constant_symbol(right_term)
+
+    def try_collect_constant(self, rule):
+        """
+        If `rule` has the shape 'name = value.', record self.constants[name]
+        = value (resolving `value` through term_to_value, but NOT resolving
+        `name` itself, since it's the symbol being defined) and return True.
+        """
+
+        if not self.is_constant_definition(rule):
+            return False
+
+        head = rule.head
+        atom = head.atom
+        guards = atom.guards
+
+        left_term = atom.term
+        right_term = guards[0].term
+
+        def is_bare_constant_symbol(term):
+            return (
+                term.ast_type == ast.ASTType.SymbolicTerm
+                and term.symbol.type == clingo.SymbolType.Function
+                and len(term.symbol.arguments) == 0
+            )
+
+        if is_bare_constant_symbol(left_term):
+            name = left_term.symbol.name
+            value = self.term_to_value(right_term)
+        else:
+            name = right_term.symbol.name
+            value = self.term_to_value(left_term)
+
+        self.constants[name] = value
+        return True
+
+    # -----------------------------------------------------------------
+    # rule / fact visiting
+    # -----------------------------------------------------------------
+
+    def visit_rule(self, rule):
+
+        if self.try_collect_constant(rule):
+            return
+
+        head = rule.head
+
         if head.ast_type != ast.ASTType.Literal:
-            print("aggregate in head")
-            # disjunctions / aggregates in head not supported here
+            return
+
+        atom = head.atom
+
+        if atom.ast_type == ast.ASTType.SymbolicAtom and atom.symbol.ast_type == ast.ASTType.Pool:
+            if rule.body:
+                raise ValueError(f"Pooled atom with non-empty body not supported: {rule}")
+            if head.sign == ast.Sign.Negation:
+                raise ValueError(f"Negated pooled head not supported: {rule}")
+
+            for pred, args in self.expand_atom_pool(atom):
+                if any(isinstance(a, str) and is_var(a) for a in args):
+                    raise ValueError(f"Fact with variables not supported: {pred}{args}")
+                for ground_args in expand_multi_args(args):
+                    self.facts.add((pred,) + ground_args)
             return
 
         head_atom = self.literal_to_atom(head)
-
-        if head_atom is None:
-            return
 
         sign, pred, args = head_atom
 
@@ -310,42 +483,78 @@ class RuleExtractor:
 
         body = []
 
-        #parse all body atoms
         for lit in rule.body:
             atom = self.literal_to_atom(lit)
-            print(atom)
-            if atom is None:
-                raise ValueError(
-                    "Unsupported body literal (comparison/aggregate/theory atom); "
-                    "extend RuleExtractor to handle it"
-                )
+
+            if atom[0] in ("pos", "neg"):
+                _, _, atom_args = atom
+                if any(isinstance(a, tuple) and len(a) == 2 and a[0] == "multi" for a in atom_args):
+                    raise ValueError(
+                        f"Interval/pool arguments not supported in body literals: {lit}"
+                    )
+
             body.append(atom)
 
         if not body:
-            # fact (must be ground)
-            if any(isinstance(a, str) and a[:1].isupper() for a in args):
+            if any(isinstance(a, str) and is_var(a) for a in args):
                 raise ValueError(f"Fact with variables not supported: {pred}{args}")
-            self.facts.add((pred,) + args)
+
+            for ground_args in expand_multi_args(args):
+                self.facts.add((pred,) + ground_args)
         else:
             self.rules.append({"head": (pred, args), "body": body})
+        
+    def expand_atom_pool(self, atom):
+        """
+        Given a SymbolicAtom whose .symbol is a Pool of Function terms
+        (e.g. val3(1;43) -> Pool[Function val3(1), Function val3(43)]),
+        return a list of (pred, args) pairs, one per pool alternative.
+        Each alternative may itself contain Interval/Pool arguments,
+        which are returned as ("multi", [...]) markers for the caller
+        to expand further.
+        """
 
+        sym = atom.symbol
+
+        if sym.ast_type != ast.ASTType.Pool:
+            raise ValueError(f"expand_atom_pool called on non-pool atom: {atom}")
+
+        results = []
+
+        for alt in sym.arguments:
+            if alt.ast_type != ast.ASTType.Function:
+                raise ValueError(f"Unsupported pooled atom alternative: {alt}")
+
+            pred = alt.name
+            args = tuple(self.term_to_value(a) for a in alt.arguments)
+            results.append((pred, args))
+
+        return results
+def expand_multi_args(args):
+    """
+    Given a tuple of args where some may be ("multi", [v1, v2, ...])
+    markers (produced by Interval/Pool terms), yield every concrete
+    ground tuple from their cartesian product. Plain (non-multi) args
+    are held fixed.
+    """
+
+    choices = []
+
+    for a in args:
+        if isinstance(a, tuple) and len(a) == 2 and a[0] == "multi":
+            choices.append(a[1])
+        else:
+            choices.append([a])
+
+    for combo in itertools.product(*choices):
+        yield combo
 
 # =====================================================================
 # 3. Evaluator (TP fixpoint per stratum)
 # =====================================================================
 
-import re
-
-VAR_RE = re.compile(r"^[A-Z_]")
-
-
-def is_var(t):
-    return isinstance(t, str) and bool(VAR_RE.match(t))
-
-
 def apply_subst(args, subst):
-    return tuple(subst.get(a, a) if is_var(a) else a for a in args)
-
+    return tuple(resolve(a, subst) for a in args)
 
 def match_atom(pattern_args, fact_args, subst):
     if len(pattern_args) != len(fact_args):
@@ -366,7 +575,6 @@ def match_atom(pattern_args, fact_args, subst):
 
     return new_subst
 
-import operator
 
 _CMP_FUNCS = {
     "<": operator.lt,
@@ -376,6 +584,27 @@ _CMP_FUNCS = {
     "=": operator.eq,
     "!=": operator.ne,
 }
+
+
+def resolve(val, subst):
+    if is_var(val):
+        return subst.get(val, val)
+
+    if isinstance(val, tuple) and len(val) == 4 and val[0] == "expr":
+        _, op, left, right = val
+
+        lval = resolve(left, subst)
+        rval = resolve(right, subst)
+
+        if is_var(lval) or is_var(rval):
+            raise ValueError(f"Unbound variable in arithmetic expression: {val}")
+
+        try:
+            return RuleExtractor._BIN_OPS[op](lval, rval)
+        except ZeroDivisionError:
+            raise ValueError(f"Division by zero evaluating: {val}")
+
+    return val
 
 
 def solve_body(body, facts):
@@ -404,23 +633,61 @@ def solve_body(body, facts):
 
     for subst1 in rec(pos, {}):
 
-        # check comparisons (must be ground by now)
+        # --- comparison / assignment handling -----------------------
+        # Repeatedly resolve "=" assignments until fixpoint, collecting
+        # the remaining (non-assignment-resolved) comparisons to check.
+        subst1 = dict(subst1)
+        remaining = list(cmp)
         ok = True
 
-        for _, op, (left, right) in cmp:
-            lval = resolve(left, subst1)
-            rval = resolve(right, subst1)
+        changed = True
+        while changed:
+            changed = False
+            still_remaining = []
 
-            if is_var(lval) or is_var(rval):
-                raise ValueError(f"Unbound variable in comparison: {left} {op} {right}")
+            for _, op, (left, right) in remaining:
+                lval = resolve(left, subst1)
+                rval = resolve(right, subst1)
 
-            if not _CMP_FUNCS[op](lval, rval):
-                ok = False
+                if op == "=":
+                    l_unbound = is_var(lval)
+                    r_unbound = is_var(rval)
+
+                    if l_unbound and not r_unbound:
+                        subst1[lval] = rval
+                        changed = True
+                        continue
+                    if r_unbound and not l_unbound:
+                        subst1[rval] = lval
+                        changed = True
+                        continue
+                    if not l_unbound and not r_unbound:
+                        if not _CMP_FUNCS["="](lval, rval):
+                            ok = False
+                        continue
+                    # both unbound: keep for later
+                    still_remaining.append((_, op, (left, right)))
+                    continue
+
+                if is_var(lval) or is_var(rval):
+                    still_remaining.append((_, op, (left, right)))
+                    continue
+
+                if not _CMP_FUNCS[op](lval, rval):
+                    ok = False
+
+            remaining = still_remaining
+
+            if not ok:
                 break
 
         if not ok:
             continue
 
+        if remaining:
+            raise ValueError(f"Unbound variable(s) in comparisons: {remaining}")
+        # --------------------------------------------------------------
+        print("DEBUG subst1 before neg check:", subst1, "neg:", neg)
         # check negated literals
         for sign, pred, args in neg:
             ground_args = apply_subst(args, subst1)
@@ -525,37 +792,38 @@ def evaluate(rules, facts, pred_stratum):
 
     return facts
 
-def resolve(val, subst):
-    if is_var(val):
-        return subst.get(val, val)
-    return val
 
 # =====================================================================
 # 4. Driver
 # =====================================================================
 
-def parse_file(filename_content):
+def parse_file(filename_content, name_to_value=None):
 
+    # --- Pass 1: collect constant definitions (name = value.) ---
+    const_collector = RuleExtractor(name_to_value=name_to_value)
+
+    def collect_constants(stmt):
+        if stmt.ast_type == ast.ASTType.Rule:
+            const_collector.try_collect_constant(stmt)
+
+    ast.parse_string(filename_content, collect_constants)
+
+    # --- Pass 2: full extraction, with constants already known ---
     dep = DependencyExtractor()
-    rex = RuleExtractor()
+    rex = RuleExtractor(name_to_value=name_to_value)
+    rex.constants = dict(const_collector.constants)
 
     def on_statement(stmt):
         if stmt.ast_type == ast.ASTType.Rule:
-            print(stmt)
             dep.visit_rule(stmt)
             rex.visit_rule(stmt)
-        else:
-            print("non rule"+str(stmt))
+
     ast.parse_string(filename_content, on_statement)
 
     return dep, rex
 
 
-
-
 def preprocess_floats(filename):
-
-
     """
     Read `filename`, find every float literal (e.g. 36.6, -2.5, 0.001),
     and replace each *distinct* value with a unique placeholder constant
@@ -572,22 +840,18 @@ def preprocess_floats(filename):
         value_to_name  : dict float_value -> placeholder name (str)
         name_to_value  : dict placeholder name -> float_value (reverse map)
     """
-    
+
     FLOAT_RE = re.compile(r'(?<![\w.])(-?\d+\.\d+)(?![\w.])')
     STRING_RE = re.compile(r'"(?:\\.|[^"\\])*"')
-    
-    def find_free_placeholder_base(text):
-        """
-        Find a placeholder base name "_float_placeholder" (possibly prefixed
-        with extra underscores) that does not occur anywhere in `text`.
-        """
 
+    def find_free_placeholder_base(text):
         base = "_float_placeholder"
 
         while base in text:
             base = "_" + base
 
         return base
+
     with open(filename, "r", encoding="utf-8") as f:
         text = f.read()
 
@@ -609,27 +873,22 @@ def preprocess_floats(filename):
         return value_to_name[val]
 
     def repl_segment(segment):
-        # segment is guaranteed to contain no quoted strings
         return FLOAT_RE.sub(repl_float, segment)
 
-    # Split the text into alternating non-string / string segments so
-    # floats inside "..." are left untouched.
     pieces = []
     last_end = 0
 
     for m in STRING_RE.finditer(text):
-        # text before this string literal: replace floats
         pieces.append(repl_segment(text[last_end:m.start()]))
-        # the string literal itself: keep as-is
         pieces.append(m.group(0))
         last_end = m.end()
 
-    # trailing piece after the last string literal
     pieces.append(repl_segment(text[last_end:]))
 
     patched_text = "".join(pieces)
 
     return patched_text, value_to_name, name_to_value
+
 
 def main():
 
@@ -639,18 +898,20 @@ def main():
 
     filename = sys.argv[1]
 
-    preprocessed_file,map_float_str,map_str_float= preprocess_floats(filename)
+    preprocessed_file, _, map_str_float = preprocess_floats(filename)
     print(preprocessed_file)
-    print(map_float_str)
     print(map_str_float)
 
     try:
-        dep, rex = parse_file(preprocessed_file)
+        dep, rex = parse_file(preprocessed_file, name_to_value=map_str_float)
     except RuntimeError as e:
         print("Parse error:")
         print(e)
         sys.exit(1)
-    
+    except ValueError as e:
+        print(f"Background error: {e}")
+        sys.exit(1)
+
     stratified, sccs, violating = check_stratified(
         dep.predicates, dep.pos_edges, dep.neg_edges
     )
@@ -665,7 +926,11 @@ def main():
 
     pred_stratum = compute_strata(dep.predicates, dep.pos_edges, dep.neg_edges, sccs)
 
-    answer_set = evaluate(rex.rules, rex.facts, pred_stratum)
+    try:
+        answer_set = evaluate(rex.rules, rex.facts, pred_stratum)
+    except ValueError as e:
+        print(f"Evaluation error: {e}")
+        sys.exit(1)
 
     print("\nAnswer set:")
 
