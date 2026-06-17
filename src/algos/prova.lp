@@ -20,4 +20,7 @@ ab1(X) :- not is_fish(X,0), species(X).
 ab2(X) :- atom(X), X<20.
 ab2(X) :- atom(X),atom(Y), X<Y.
 
-%commentinot
+%commenti not
+q :-val(12).
+%feature: species/1 MIN
+%feature: q 
