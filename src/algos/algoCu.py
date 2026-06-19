@@ -8,11 +8,12 @@ from src.algos.best_ig_kernelsCu import *
 from src.algos.cover_kernelsCu import *
 from src.common.flatRule import *
 import cupy as cp
+from src.algos.background import *
 
 #######################################                ##########################################
 #######################################  MAIN METHODS  ##########################################
 
-def CUDatILP(data, ratio=0.5):
+def CUDatILP(data, bg_file, ratio=0.5):
     ret = []
     # Accumulators for timings
     overall_most = 0
@@ -26,6 +27,10 @@ def CUDatILP(data, ratio=0.5):
     total_time = 0 
     learn_rule_loops = 0
     
+    if(bg_file is not None):
+        data_incremented=add_background(bg_file,data)
+        print(data_incremented)
+
     
     begin_preprocess = timer()
     embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data)

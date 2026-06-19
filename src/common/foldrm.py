@@ -24,12 +24,12 @@ class Classifier:
         else:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
         return data
-
+    
     def fit(self, data, ratio=0.5):
         self.rules = foldrm(data, ratio=ratio)
     
-    def fitGPU(self, data, ratio=0.5):
-        self.rules = CUDatILP(data, ratio=ratio)
+    def fitGPU(self, data, ratio=0.5, bg_file=None):
+        self.rules = CUDatILP(data, bg_file, ratio=ratio)
 
     def predict(self, X):
         return predict(self.rules, X)

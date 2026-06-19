@@ -24,3 +24,8 @@ ab2(X) :- atom(X),atom(Y), X<Y.
 q :-val(12).
 %feature: species/1 MIN
 %feature: q 
+habitat(ab1,water) :- (2*2.5)**2<Y, Y=X, val(X).
+perceived_temp(Room, PT) :-
+    temperature(Room, T),
+    humidity(Room, H),
+    PT = T + 0.1 * (H - 50).

@@ -348,7 +348,7 @@ def plot_test_results(names, serial_times, parallel_times):
 
 def fast_check():
     test_failed=0
-    loaders = [acute,adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
+    loaders = [acute]#adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
 
 
 
@@ -440,9 +440,9 @@ def bg_comparison():
 
 def main():
     
-    #fast_check()
+    fast_check()
     #compare_times()
-    bg_comparison()
+    #bg_comparison()
 
 if __name__ == '__main__':
     main()

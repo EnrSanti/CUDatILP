@@ -5,7 +5,7 @@ import re
 import operator
 import itertools
 from collections import defaultdict
-from background_features import *
+from src.algos.background_features import *
 import clingo
 import clingo.ast as ast
 
@@ -1000,27 +1000,46 @@ def preprocess_floats(file_content):
 
     return patched_text, value_to_name, name_to_value
 
-def main():
 
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} file.lp")
-        sys.exit(1)
 
-    filename = sys.argv[1]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def add_background(filename,data):
+    """
+    Parse and validate the background .lp file ONCE.
+    Returns everything needed to repeatedly evaluate per-row:
+      - rex         : RuleExtractor (rules + static facts from the .lp)
+      - pred_stratum: stratum map for evaluate()
+      - feature_directives: list of FeatureDirective
+      - attrs       : list of new column names (one per directive)
+    """
 
     with open(filename, "r", encoding="utf-8") as f:
         raw_text = f.read()
 
     text_without_steps, stepped_facts = expand_stepped_intervals(raw_text)
-
-
     preprocessed_file, _, map_str_float = preprocess_floats(text_without_steps)
 
     try:
         dep, rex = parse_file(preprocessed_file, name_to_value=map_str_float)
     except RuntimeError as e:
-        print("Parse error:")
-        print(e)
+        print(f"Parse error: {e}")
         sys.exit(1)
     except ValueError as e:
         print(f"Background error: {e}")
@@ -1031,17 +1050,12 @@ def main():
         for t in tuples:
             rex.facts.add((pred,) + t)
 
-    # --- %feature: directive parsing + validation ---
     try:
         feature_directives = parse_feature_directives(raw_text)
         validate_feature_directives(feature_directives, rex)
     except ValueError as e:
         print(f"Feature directive error: {e}")
         sys.exit(1)
-
-    print(f"\nParsed {len(feature_directives)} feature directive(s):")
-    for d in feature_directives:
-        print(f"  {d}")
 
     stratified, sccs, violating = check_stratified(
         dep.predicates, dep.pos_edges, dep.neg_edges
@@ -1053,26 +1067,23 @@ def main():
             print(f"  {u} -|> {v}")
         sys.exit(1)
 
-    print("Program is stratified.")
+    pred_stratum = compute_strata(
+        dep.predicates, dep.pos_edges, dep.neg_edges, sccs
+    )
 
-    pred_stratum = compute_strata(dep.predicates, dep.pos_edges, dep.neg_edges, sccs)
-
-    try:
-        answer_set = evaluate(rex.rules, rex.facts, pred_stratum)
-    except ValueError as e:
-        print(f"Evaluation error: {e}")
-        sys.exit(1)
-
-    print("\nAnswer set:")
-
-    for f in sorted(answer_set, key=lambda x: (x[0], x[1:])):
-        pred = f[0]
-        args = f[1:]
-        if args:
-            print(f"{pred}({','.join(map(str, args))})")
+    # derive new column names from directives
+    attrs = []
+    for d in feature_directives:
+        if d.arity == 0:
+            attrs.append(d.pred)
         else:
-            print(pred)
+            attrs.append(f"{d.pred}_{d.agg.lower()}")
+
+    print(f"Background parsed. {len(feature_directives)} feature directive(s): {attrs}")
+
+    #augment_data()
+    return rex, pred_stratum, feature_directives, attrs
 
 
-if __name__ == "__main__":
-    main()
+
+
