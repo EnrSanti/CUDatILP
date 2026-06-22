@@ -28,8 +28,9 @@ class Classifier:
     def fit(self, data, ratio=0.5):
         self.rules = foldrm(data, ratio=ratio)
     
-    def fitGPU(self, data, ratio=0.5, bg_file=None):
-        self.rules = CUDatILP(data, bg_file, ratio=ratio)
+    def fitGPU(self, data, bg_file=None,col_names=None, ratio=0.5):
+        print("col_names ",col_names)
+        self.rules = CUDatILP(data, bg_file, col_names, ratio=ratio)
 
     def predict(self, X):
         return predict(self.rules, X)

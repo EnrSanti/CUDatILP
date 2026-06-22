@@ -348,9 +348,8 @@ def plot_test_results(names, serial_times, parallel_times):
 
 def fast_check():
     test_failed=0
-    loaders = [acute]#adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
-
-
+    bg_files=["data/bg_two_lines.lp"]
+    loaders = [two_lines]#sudoku, two_lines,shape_volume]#adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
 
     for i in range(len(loaders)):
         model, data = loaders[i]()   # call function
@@ -377,7 +376,7 @@ def fast_check():
         data_train, data_test = split_data_deterministically(data, ratio=0.8)
 
         start_gpu = timer()
-        model.fitGPU(data_train, ratio=0.4)
+        model.fitGPU(data_train,ratio=0.4,bg_file=bg_files[i])
         end_gpu = timer()
 
         h_gpu=model.get_asp(simple=True)
@@ -414,7 +413,7 @@ def fast_check():
             print(f"{GREEN}test1 passed{RESET}")
             print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
 
-            #print(h_cpu+"\n-----------------------------------\n"+h_gpu)
+            print(h_cpu+"\n-----------------------------------\n"+h_gpu)
         
         
     
@@ -425,11 +424,13 @@ def fast_check():
 
 
 def bg_comparison():
-    model, data = sudoku()
+
+    
+    model, data,col_names = two_lines()
     data_train, data_test = split_data(data, ratio=0.8)
 
     start = timer()
-    model.fitGPU(data_train, ratio=0.5)
+    model.fitGPU(data_train,bg_file="data/bg_two_lines.lp",col_names=col_names,ratio=0.5)
     end = timer()
     
     model.print_asp(simple=True)
@@ -440,9 +441,9 @@ def bg_comparison():
 
 def main():
     
-    fast_check()
+    #fast_check()
     #compare_times()
-    #bg_comparison()
+    bg_comparison()
 
 if __name__ == '__main__':
     main()

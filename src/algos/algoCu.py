@@ -13,7 +13,7 @@ from src.algos.background import *
 #######################################                ##########################################
 #######################################  MAIN METHODS  ##########################################
 
-def CUDatILP(data, bg_file, ratio=0.5):
+def CUDatILP(data, bg_file, col_names, ratio=0.5):
     ret = []
     # Accumulators for timings
     overall_most = 0
@@ -28,8 +28,13 @@ def CUDatILP(data, bg_file, ratio=0.5):
     learn_rule_loops = 0
     
     if(bg_file is not None):
-        data_incremented=add_background(bg_file,data)
-        print(data_incremented)
+        
+        formatted = []
+        for col in col_names:
+            formatted.append(col.replace(" ", "_"))
+        
+        data_incremented=add_background(bg_file,data,formatted)
+        print("data_incremented"+str(data_incremented))
 
     
     begin_preprocess = timer()

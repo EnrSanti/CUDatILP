@@ -3538,4 +3538,21 @@ def sudoku():
     print('\n% weight lifting dataset', np.shape(data))
     return model, data
 
+def two_lines():
+    attrs = ['x','y']
+    ret_attrs=attrs.copy()
+    nums = attrs
+    model = Classifier(attrs=attrs, numeric=nums, label='class')
+    data = model.load_data('data/two_lines_3000.csv')
+    print('\n% weight lifting dataset', np.shape(data))
+    return model, data, ret_attrs
+
+
+def shape_volume():
+    attrs = ['base_parameter','height','volume']
+    nums = attrs
+    model = Classifier(attrs=attrs, numeric=nums, label='label')
+    data = model.load_data('data/shape_volume_dataset.csv')
+    print('\n% weight lifting dataset', np.shape(data))
+    return model, data
 #---------------------------

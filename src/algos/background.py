@@ -1001,26 +1001,7 @@ def preprocess_floats(file_content):
     return patched_text, value_to_name, name_to_value
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def add_background(filename,data):
+def add_background(filename,data,pred_names_col):
     """
     Parse and validate the background .lp file ONCE.
     Returns everything needed to repeatedly evaluate per-row:
@@ -1029,7 +1010,7 @@ def add_background(filename,data):
       - feature_directives: list of FeatureDirective
       - attrs       : list of new column names (one per directive)
     """
-
+    #print(data)
     with open(filename, "r", encoding="utf-8") as f:
         raw_text = f.read()
 
@@ -1080,9 +1061,43 @@ def add_background(filename,data):
             attrs.append(f"{d.pred}_{d.agg.lower()}")
 
     print(f"Background parsed. {len(feature_directives)} feature directive(s): {attrs}")
+    
+    for row_idx in range(len(data)):
+        row_facts=set()
+    
+    
+        print("pred_names_col ", pred_names_col)
+    
+        for i in range(len(pred_names_col)):
+            value_extracted=data[row_idx][i]
+            pred_name=pred_names_col[i]
+            row_facts.add((pred_name, value_extracted))
+        
+        facts = rex.facts | row_facts 
+        #add facts
+        #for 
+        print(rex.facts)
+        answer_set = evaluate(rex.rules, facts, pred_stratum)
 
-    #augment_data()
-    return rex, pred_stratum, feature_directives, attrs
+        list_to_add=[]
+        for d in feature_directives:
+            if d.arity == 0:
+                #check if feature is in as
+                # if so add 1 to list else 0 
+            else:
+                #check if feature is in as
+                #if so, take min/max according to what specified
+                #else if the type is string/atom put "ATOM NOT FOUND IN AS" or 
+
+            data[row_idx].extend(list_to_add)
+
+
+
+        print("answer_set "+str(answer_set))
+    
+    print(data)
+
+    return data
 
 
 
