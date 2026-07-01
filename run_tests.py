@@ -426,11 +426,11 @@ def fast_check():
 def bg_comparison():
 
     
-    model, data,col_names = two_lines()
+    model, data,col_names = two_circles()#two_lines()
     data_train, data_test = split_data(data, ratio=0.8)
 
     start = timer()
-    model.fitGPU(data_train,bg_file="data/bg_two_lines.lp",col_names=col_names,ratio=0.5)
+    model.fitGPU(data_train,bg_file="data/bg_two_circles.lp",col_names=col_names,ratio=0.5)
     end = timer()
     
     model.print_asp(simple=True)

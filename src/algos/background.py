@@ -799,7 +799,7 @@ def solve_body(body, facts):
         if remaining:
             raise ValueError(f"Unbound variable(s) in comparisons: {remaining}")
         # --------------------------------------------------------------
-        print("DEBUG subst1 before neg check:", subst1, "neg:", neg)
+        #print("DEBUG subst1 before neg check:", subst1, "neg:", neg)
         # check negated literals
         for sign, pred, args in neg:
             ground_args = apply_subst(args, subst1)
@@ -953,7 +953,7 @@ def preprocess_floats(file_content):
         name_to_value  : dict placeholder name -> float_value (reverse map)
     """
 
-    FLOAT_RE = re.compile(r'(?<![\w.])(-?\d+\.\d+)(?![\w.])')
+    FLOAT_RE = re.compile(r'(?<![.\d])(-?\d+\.\d+)(?!\d)')
     STRING_RE = re.compile(r'"(?:\\.|[^"\\])*"')
 
     def find_free_placeholder_base(text):
@@ -1001,7 +1001,7 @@ def preprocess_floats(file_content):
     return patched_text, value_to_name, name_to_value
 
 
-def add_background(filename,data,pred_names_col):
+def add_background(filename,data,model,pred_names_col):
     """
     Parse and validate the background .lp file ONCE.
     Returns everything needed to repeatedly evaluate per-row:
@@ -1017,6 +1017,8 @@ def add_background(filename,data,pred_names_col):
     text_without_steps, stepped_facts = expand_stepped_intervals(raw_text)
     preprocessed_file, _, map_str_float = preprocess_floats(text_without_steps)
 
+    print(preprocessed_file)
+    
     try:
         dep, rex = parse_file(preprocessed_file, name_to_value=map_str_float)
     except RuntimeError as e:
@@ -1033,6 +1035,7 @@ def add_background(filename,data,pred_names_col):
 
     try:
         feature_directives = parse_feature_directives(raw_text)
+        #TODO check che non sia anche già nel csv
         validate_feature_directives(feature_directives, rex)
     except ValueError as e:
         print(f"Feature directive error: {e}")
@@ -1052,21 +1055,17 @@ def add_background(filename,data,pred_names_col):
         dep.predicates, dep.pos_edges, dep.neg_edges, sccs
     )
 
-    # derive new column names from directives
-    attrs = []
-    for d in feature_directives:
-        if d.arity == 0:
-            attrs.append(d.pred)
-        else:
-            attrs.append(f"{d.pred}_{d.agg.lower()}")
+    attrs_to_add=[]
+    for f in feature_directives:
+        attrs_to_add.append(f.pred)
 
-    print(f"Background parsed. {len(feature_directives)} feature directive(s): {attrs}")
-    
+    model.attrs[-1:-1] = attrs_to_add
+    #model.numeric[-1:-1] = attrs_to_add
     for row_idx in range(len(data)):
         row_facts=set()
     
     
-        print("pred_names_col ", pred_names_col)
+        #print("pred_names_col ", pred_names_col)
     
         for i in range(len(pred_names_col)):
             value_extracted=data[row_idx][i]
@@ -1080,16 +1079,37 @@ def add_background(filename,data,pred_names_col):
         answer_set = evaluate(rex.rules, facts, pred_stratum)
 
         list_to_add=[]
+        print("QUI: "+str(feature_directives))
         for d in feature_directives:
             if d.arity == 0:
                 #check if feature is in as
                 # if so add 1 to list else 0 
+                present = any(atom[0] == d.pred for atom in answer_set)
+                list_to_add.append(1 if present else 0)
+
             else:
                 #check if feature is in as
                 #if so, take min/max according to what specified
                 #else if the type is string/atom put "ATOM NOT FOUND IN AS" or 
+                candidates = []
+                for atom in answer_set:
+                    if atom[0] == d.pred:
+                        candidates.append(atom[1])
 
-            data[row_idx].extend(list_to_add)
+
+                if candidates:
+                    if d.agg == "MIN":
+                        list_to_add.append(min(candidates))
+                    else:  # MAX
+                        list_to_add.append(max(candidates))
+                else:
+                    # predicate not found in this row's answer set:
+                    # fall back to the user-specified default
+                    list_to_add.append(d.default)
+
+          
+        print("list to add"+str(list_to_add))
+        data[row_idx][-1:-1]=list_to_add
 
 
 

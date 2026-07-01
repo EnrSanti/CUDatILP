@@ -23,6 +23,9 @@ class Classifier:
             data, self.attrs = load_data(file, self.attrs, self.label, self.numeric, amount)
         else:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
+        print("here: \n")
+        print(data)
+        print(self.attrs)
         return data
     
     def fit(self, data, ratio=0.5):
@@ -30,7 +33,7 @@ class Classifier:
     
     def fitGPU(self, data, bg_file=None,col_names=None, ratio=0.5):
         print("col_names ",col_names)
-        self.rules = CUDatILP(data, bg_file, col_names, ratio=ratio)
+        self.rules = CUDatILP(data, bg_file, col_names, self,ratio=ratio)
 
     def predict(self, X):
         return predict(self.rules, X)
