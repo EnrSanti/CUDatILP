@@ -887,7 +887,7 @@ def compute_strata(predicates, pos_edges, neg_edges, sccs):
     return pred_stratum
 
 
-def evaluate(rules, facts, pred_stratum):
+def evaluate_asp(rules, facts, pred_stratum):
 
     # no more layers
     if not pred_stratum:
@@ -1001,7 +1001,7 @@ def preprocess_floats(file_content):
     return patched_text, value_to_name, name_to_value
 
 
-def add_background(filename,data,model,pred_names_col):
+def add_background(filename,data,model):
     """
     Parse and validate the background .lp file ONCE.
     Returns everything needed to repeatedly evaluate per-row:
@@ -1061,25 +1061,29 @@ def add_background(filename,data,model,pred_names_col):
 
     model.attrs[-1:-1] = attrs_to_add
     #model.numeric[-1:-1] = attrs_to_add
+
+
+    model.bg_rules=(rex.rules,rex.facts,pred_stratum)
+
     for row_idx in range(len(data)):
         row_facts=set()
     
     
-        #print("pred_names_col ", pred_names_col)
+        print("pred_names_col ", model.pred_names)
     
-        for i in range(len(pred_names_col)):
+        for i in range(len(model.pred_names)):
             value_extracted=data[row_idx][i]
-            pred_name=pred_names_col[i]
+            pred_name=model.pred_names[i]
             row_facts.add((pred_name, value_extracted))
         
         facts = rex.facts | row_facts 
         #add facts
         #for 
-        print(rex.facts)
-        answer_set = evaluate(rex.rules, facts, pred_stratum)
+        answer_set = evaluate_asp(rex.rules, facts, pred_stratum)
 
         list_to_add=[]
         print("QUI: "+str(feature_directives))
+        model.feature_directives = feature_directives
         for d in feature_directives:
             if d.arity == 0:
                 #check if feature is in as

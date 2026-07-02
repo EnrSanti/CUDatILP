@@ -26,13 +26,15 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
     overall_fold = 0 
     total_time = 0 
     learn_rule_loops = 0
+    print("bg FILE", bg_file)
     if(bg_file is not None):
         
         formatted = []
         for col in col_names:
             formatted.append(col.replace(" ", "_"))
         
-        data_incremented = add_background(bg_file,data,model,formatted)
+        model.pred_names=formatted
+        data_incremented = add_background(bg_file,data,model)
         
         print("data_incremented"+str(data_incremented))
         print("model attrs "+ str(model.attrs))

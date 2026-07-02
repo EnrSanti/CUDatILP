@@ -17,6 +17,9 @@ class Classifier:
         self.seq = 1
         self.simple = None
         self.translation = None
+        self.bg_rules = None
+        self.pred_names = None
+        self.feature_directives = None
 
     def load_data(self, file, amount=-1):
         if self.label != self.attrs[-1]:
@@ -36,7 +39,7 @@ class Classifier:
         self.rules = CUDatILP(data, bg_file, col_names, self,ratio=ratio)
 
     def predict(self, X):
-        return predict(self.rules, X)
+        return predict(self.rules, X,self)
 
     def classify(self, x):
         return classify(self.rules, x)

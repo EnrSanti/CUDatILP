@@ -3538,7 +3538,7 @@ def sudoku():
     print('\n% weight lifting dataset', np.shape(data))
     return model, data
 
-def two_lines(bg_file=None):
+def two_lines():
     attrs = ['x','y']
     ret_attrs=attrs.copy()
     nums = attrs
@@ -3547,12 +3547,21 @@ def two_lines(bg_file=None):
     print('\n% weight lifting dataset', np.shape(data))
     return model, data, ret_attrs
 
-def two_circles(bg_file=None):
+def two_circles():
     attrs = ['x','y']
     ret_attrs=attrs.copy()
     nums = attrs
     model = Classifier(attrs=attrs, numeric=nums, label='class')
     data = model.load_data('../nuovi_task/two_circles.csv')
+    print('\n% weight lifting dataset', np.shape(data))
+    return model, data, ret_attrs
+
+def sigmoid():
+    attrs = ['x','y']
+    ret_attrs=attrs.copy()
+    nums = attrs
+    model = Classifier(attrs=attrs, numeric=nums, label='class')
+    data = model.load_data('../nuovi_task/sigmoid_25000.csv')
     print('\n% weight lifting dataset', np.shape(data))
     return model, data, ret_attrs
 

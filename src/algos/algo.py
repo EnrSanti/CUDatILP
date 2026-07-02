@@ -2,7 +2,7 @@ import math
 from numba import cuda
 import numpy as np
 from timeit import default_timer as timer
-
+from src.algos.background import evaluate_asp
 
 
 def split_data_by_item(data, item):
@@ -62,19 +62,74 @@ def cover(item, x):
 
 
 
-def classify(items, x):
+def classify(items, x, model):
+    print("x ",x)
+    
+    #bg_rules=(rex.rules,rex.facts,pred_stratum)
+    
+    row_facts=set()
+    
+    if(model.pred_names is not None):
+    
+        print("pred_names_col ", model.pred_names)
+
+        for i in range(len(model.pred_names)):
+            value_extracted=x[i]
+            pred_name=model.pred_names[i]
+            row_facts.add((pred_name, value_extracted))
+        
+        rex_facts=model.bg_rules[1]
+        facts = rex_facts | row_facts 
+
+
+
+        answer_set = evaluate_asp(model.bg_rules[0], facts, model.bg_rules[2])
+
+        print("answer_set "+str(answer_set))
+        list_to_add=[]
+
+        for d in model.feature_directives:
+            if d.arity == 0:
+                #check if feature is in as
+                # if so add 1 to list else 0 
+                present = any(atom[0] == d.pred for atom in answer_set)
+                list_to_add.append(1 if present else 0)
+
+            else:
+                #check if feature is in as
+                #if so, take min/max according to what specified
+                #else if the type is string/atom put "ATOM NOT FOUND IN AS" or 
+                candidates = []
+                for atom in answer_set:
+                    if atom[0] == d.pred:
+                        candidates.append(atom[1])
+
+
+                if candidates:
+                    if d.agg == "MIN":
+                        list_to_add.append(min(candidates))
+                    else:  # MAX
+                        list_to_add.append(max(candidates))
+                else:
+                    # predicate not found in this row's answer set:
+                    # fall back to the user-specified default
+                    list_to_add.append(d.default)
+
+        x[-1:-1]=list_to_add
+
+        print("x ADDED : "+str(x))
+        print("facts: "+str(facts))
     for i in items:
         if evaluate(i, x):
             return i[0][2]
     return None
 
 
-def predict(rules, data):
+def predict(rules, data, model):
     ret = []
     for x in data:
-        ret.append(classify(rules, x))
+        ret.append(classify(rules, x,model))
     return ret
-
 
 def gain(tp, fn, tn, fp):
 
