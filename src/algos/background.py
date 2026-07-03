@@ -1017,7 +1017,7 @@ def add_background(filename,data,model):
     text_without_steps, stepped_facts = expand_stepped_intervals(raw_text)
     preprocessed_file, _, map_str_float = preprocess_floats(text_without_steps)
 
-    print(preprocessed_file)
+    #print(preprocessed_file)
     
     try:
         dep, rex = parse_file(preprocessed_file, name_to_value=map_str_float)
@@ -1056,11 +1056,22 @@ def add_background(filename,data,model):
     )
 
     attrs_to_add=[]
-    for f in feature_directives:
-        attrs_to_add.append(f.pred)
+    num_attrs=[]
 
+    print("before adding"+str(model.attrs))
+    print("before numeric"+str(model.numeric))
+    for f in feature_directives:
+        print("feature f"+str(f))
+        attrs_to_add.append(f.pred)
+        if(f.type == 'numeric'):
+            num_attrs.append(f.pred)
+
+    print(model.attrs)
+    print(model.numeric)
+    print(num_attrs)
+    print(attrs_to_add)
     model.attrs[-1:-1] = attrs_to_add
-    #model.numeric[-1:-1] = attrs_to_add
+    model.numeric[-1:-1] = num_attrs
 
 
     model.bg_rules=(rex.rules,rex.facts,pred_stratum)
@@ -1069,7 +1080,7 @@ def add_background(filename,data,model):
         row_facts=set()
     
     
-        print("pred_names_col ", model.pred_names)
+        #print("pred_names_col ", model.pred_names)
     
         for i in range(len(model.pred_names)):
             value_extracted=data[row_idx][i]
@@ -1082,7 +1093,7 @@ def add_background(filename,data,model):
         answer_set = evaluate_asp(rex.rules, facts, pred_stratum)
 
         list_to_add=[]
-        print("QUI: "+str(feature_directives))
+        #print("QUI: "+str(feature_directives))
         model.feature_directives = feature_directives
         for d in feature_directives:
             if d.arity == 0:
@@ -1115,17 +1126,10 @@ def add_background(filename,data,model):
                     list_to_add.append(d.default)
 
           
-        print("list to add"+str(list_to_add))
+        #print("list to add"+str(list_to_add))
         data[row_idx][-1:-1]=list_to_add
 
-
-
-        print("answer_set "+str(answer_set))
-    
-    print(data)
-
-    return data
-
+    #print(data)
 
 
 

@@ -26,7 +26,10 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
     overall_fold = 0 
     total_time = 0 
     learn_rule_loops = 0
-    print("bg FILE", bg_file)
+    #print("bg FILE", bg_file)
+    
+    print("attrs "+str(model.attrs))
+    print("numeric "+str(model.numeric))
     if(bg_file is not None):
         
         formatted = []
@@ -34,13 +37,13 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
             formatted.append(col.replace(" ", "_"))
         
         model.pred_names=formatted
-        data_incremented = add_background(bg_file,data,model)
+        add_background(bg_file,data,model)
         
-        print("data_incremented"+str(data_incremented))
-        print("model attrs "+ str(model.attrs))
-        print("model numeric "+ str(model.numeric))
+        
+        #print("data_incremented"+str(data_incremented))
 
-    
+    print("attrs "+str(model.attrs))
+    print("numeric "+str(model.numeric))
     begin_preprocess = timer()
     embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data)
     

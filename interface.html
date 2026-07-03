@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CUD@ILP²</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===== THEME TOKENS ===== */
+[data-theme="dark"] {
+  --ink:         #121820;
+  --panel:       #1B2430;
+  --panel-raised:#212C3A;
+  --line:        #2C3844;
+  --cream:       #E9E4D6;
+  --cream-dim:   #9AA5B1;
+  --amber:       #E3B34F;
+  --amber-dim:   #8A6E33;
+  --teal:        #6FA69A;
+  --red:         #C77B6B;
+  --overlay:     rgba(0,0,0,0.60);
+  --shadow:      0 8px 32px rgba(0,0,0,0.45);
+}
+
+[data-theme="light"] {
+  --ink:         #F0EDE6;
+  --panel:       #FAFAF7;
+  --panel-raised:#F0EDE6;
+  --line:        #D5D0C6;
+  --cream:       #1B2430;
+  --cream-dim:   #5A6472;
+  --amber:       #B8861E;
+  --amber-dim:   #9A7118;
+  --teal:        #3D7A6E;
+  --red:         #A04F42;
+  --overlay:     rgba(0,0,0,0.30);
+  --shadow:      0 8px 32px rgba(0,0,0,0.15);
+}
+
+*{ box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  background-image:
+    radial-gradient(circle at 15% 0%,  rgba(111,166,154,0.06), transparent 45%),
+    radial-gradient(circle at 85% 100%, rgba(227,179,79,0.05),  transparent 45%);
+  color: var(--cream);
+  font-family: 'IBM Plex Sans', sans-serif;
+  min-height: 100vh;
+  transition: background .25s, color .25s;
+}
+
+/* ===== LAYOUT ===== */
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 28px 80px;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+/* theme toggle */
+.theme-toggle {
+  margin-left: auto;
+  align-self: center;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 4px 5px;
+  display: flex;
+  gap: 2px;
+  cursor: pointer;
+}
+.theme-toggle button {
+  background: none;
+  border: none;
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  color: var(--cream-dim);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.theme-toggle button.active {
+  background: var(--panel);
+  color: var(--cream);
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+
+.mark {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.5px;
+  color: var(--cream);
+}
+.mark sup { color: var(--amber); font-size: 18px; }
+.mark .at { color: var(--teal); }
+
+.therefore {
+  color: var(--amber-dim);
+  font-family: 'Space Mono', monospace;
+  font-size: 20px;
+}
+
+.tagline {
+  color: var(--cream-dim);
+  font-size: 13.5px;
+  margin: 4px 0 40px;
+  letter-spacing: 0.3px;
+}
+.tagline code {
+  font-family: 'Space Mono', monospace;
+  color: var(--teal);
+  background: rgba(111,166,154,0.08);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 440px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+/* ===== CARD ===== */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.card-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.card-head h2 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  font-weight: 600;
+}
+.clause {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.clause:last-of-type { border-bottom: none; }
+.clause-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--amber-dim);
+  display: block;
+  margin-bottom: 6px;
+}
+label.field-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--cream);
+  margin-bottom: 2px;
+}
+.field-label .req { color: var(--red); font-weight: 700; margin-left: 3px; }
+.field-label .opt { color: var(--cream-dim); font-weight: 400; font-size: 11.5px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.field-help {
+  font-size: 12px;
+  color: var(--cream-dim);
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+/* ===== FILE SLOT ===== */
+.file-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-raised);
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.file-slot:hover { border-color: var(--teal); }
+.file-slot.has-file { border-style: solid; border-color: var(--amber-dim); }
+.file-slot input[type=file] { display: none; }
+.file-slot-icon { font-family: 'Space Mono', monospace; color: var(--teal); font-size: 14px; flex-shrink: 0; }
+.file-slot-text { font-size: 12.5px; color: var(--cream-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-slot.has-file .file-slot-text { color: var(--cream); }
+.clear-file {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--cream-dim);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 4px;
+  display: none;
+}
+.file-slot.has-file .clear-file { display: inline-block; }
+.clear-file:hover { color: var(--red); }
+
+/* ===== RATIO ROW ===== */
+.ratio-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ratio-row input[type=number] {
+  width: 78px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--cream);
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  padding: 7px 9px;
+  border-radius: 3px;
+}
+.ratio-row input[type=number]:focus { outline: none; border-color: var(--amber); }
+.ratio-row input[type=range] { flex: 1; accent-color: var(--amber); }
+.ratio-disabled { opacity: 0.4; pointer-events: none; }
+.inline-note { font-size: 11.5px; color: var(--teal); margin-top: 8px; }
+
+/* ===== ACTION ROW ===== */
+.action-row { padding: 18px 20px; background: var(--panel-raised); }
+button.learn {
+  width: 100%;
+  background: var(--amber);
+  color: #1a1406;
+  border: none;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  padding: 13px 16px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform .08s, background .15s;
+}
+button.learn:hover { background: #EEC066; }
+button.learn:active { transform: translateY(1px); }
+button.learn:disabled { background: var(--line); color: var(--cream-dim); cursor: not-allowed; }
+.status-line {
+  margin-top: 10px;
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  color: var(--cream-dim);
+  min-height: 16px;
+}
+.status-line.err { color: var(--red); }
+.status-line.ok  { color: var(--teal); }
+
+/* ===== OUTPUT LISTING ===== */
+.listing {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+}
+.listing-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.listing-head h2 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  font-weight: 600;
+}
+.listing-head h2 .dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+  margin-right: 8px;
+  position: relative; top: -1px;
+}
+.listing-head h2 .dot.live { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+
+button.save {
+  background: transparent;
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  font-family: 'Space Mono', monospace;
+  font-size: 11.5px;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+button.save:hover:not(:disabled) { background: var(--teal); color: var(--ink); }
+button.save:disabled { border-color: var(--line); color: var(--cream-dim); cursor: not-allowed; }
+
+.listing-body {
+  flex: 1;
+  padding: 4px 0;
+  overflow: auto;
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  line-height: 1.9;
+  min-height: 300px;
+}
+
+/* ===== TIMER ===== */
+.timer-bar {
+  border-top: 1px solid var(--line);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--cream-dim);
+}
+.timer-display {
+  color: var(--amber);
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 60px;
+}
+.timer-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ===== ERROR PANEL ===== */
+.error-panel {
+  border-top: 1px solid var(--line);
+  background: var(--panel-raised);
+  padding: 12px 20px;
+  display: none;
+}
+.error-panel.visible { display: block; }
+.error-panel-head {
+  font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--red);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.error-panel-head::before {
+  content: '✕';
+  font-size: 10px;
+}
+.error-body {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--red);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--cream-dim);
+  padding: 60px 30px;
+  text-align: center;
+}
+.empty-state .glyph { font-size: 26px; color: var(--line); }
+.empty-state p { margin: 0; font-size: 12.5px; max-width: 320px; line-height: 1.6; }
+
+/* ===== CLAUSE LINES ===== */
+.clause-line { display: flex; padding: 2px 20px; white-space: pre; }
+.clause-line:hover { background: rgba(255,255,255,0.02); }
+.ln { color: var(--amber-dim); width: 34px; flex-shrink: 0; user-select: none; text-align: right; margin-right: 16px; }
+.ln.blank { color: transparent; }
+.code-head    { color: var(--amber); }
+.code-neck    { color: var(--teal); }
+.code-body    { color: var(--cream); }
+.code-comment { color: var(--cream-dim); font-style: italic; }
+
+/* ===== SPINNER ===== */
+.spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--line);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-right: 8px;
+  vertical-align: -2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+/* ===== CSV COLUMN PICKER MODAL ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+.modal-backdrop.open { display: flex; }
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: min(700px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  animation: modal-in .18s ease;
+}
+@keyframes modal-in {
+  from { opacity:0; transform: translateY(12px) scale(.98); }
+  to   { opacity:1; transform: none; }
+}
+
+.modal-header {
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cream);
+}
+.modal-header .modal-sub {
+  font-size: 12px;
+  color: var(--cream-dim);
+  font-family: 'Space Mono', monospace;
+}
+.modal-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--cream-dim);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.modal-close:hover { color: var(--red); background: rgba(199,123,107,0.1); }
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* label section */
+.label-section {
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.label-section h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--amber);
+  font-family: 'Space Mono', monospace;
+}
+
+.label-select {
+  width: 100%;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--cream);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13.5px;
+  padding: 9px 12px;
+  border-radius: 3px;
+  appearance: none;
+  cursor: pointer;
+}
+.label-select:focus { outline: none; border-color: var(--amber); }
+
+/* features table */
+.features-section h4 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--teal);
+  font-family: 'Space Mono', monospace;
+}
+
+.feat-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.feat-table thead tr th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--cream-dim);
+  font-weight: 600;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.feat-table thead tr th:first-child { width: 36px; }
+.feat-table thead tr th:last-child  { width: 90px; text-align: center; }
+
+.feat-table tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background .1s;
+}
+.feat-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+.feat-table tbody td { padding: 9px 10px; font-size: 13px; }
+
+.feat-name {
+  font-family: 'Space Mono', monospace;
+  font-size: 12.5px;
+  color: var(--cream);
+}
+.feat-name.is-label {
+  color: var(--amber-dim);
+  font-style: italic;
+}
+
+/* custom checkbox */
+.cb-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cb-wrap input[type=checkbox] {
+  width: 15px; height: 15px;
+  accent-color: var(--amber);
+  cursor: pointer;
+}
+
+/* numeric toggle */
+.num-toggle-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.num-toggle {
+  font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+  color: var(--cream-dim);
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.num-toggle.numeric {
+  border-color: var(--teal);
+  color: var(--teal);
+  background: rgba(111,166,154,0.08);
+}
+.num-toggle:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--panel-raised);
+}
+
+button.modal-cancel {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--cream-dim);
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  padding: 9px 18px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+button.modal-cancel:hover { border-color: var(--cream-dim); color: var(--cream); }
+
+button.modal-confirm {
+  background: var(--teal);
+  border: none;
+  color: var(--ink);
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 9px 20px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+button.modal-confirm:hover { opacity: .85; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mark"><span class="at">CUD@</span>ILP<sup>2</sup></div>
+    <div class="therefore">:-</div>
+    <div class="theme-toggle" id="themeToggle" title="Toggle theme">
+      <button id="btnDark"  class="active">dark</button>
+      <button id="btnLight" class="">light</button>
+    </div>
+  </header>
+  <p class="tagline">Local hypothesis induction over background ASP rules. Point it at a dataset, derive a program, keep what holds. Runs against <code>localhost:5000</code>.</p>
+
+  <div class="grid">
+
+    <!-- ===== FORM CARD ===== -->
+    <div class="card">
+      <div class="card-head"><h2>Program</h2></div>
+
+      <!-- 01 training -->
+      <div class="clause">
+        <span class="clause-num">01 — training set</span>
+        <label class="field-label">Training CSV<span class="req">*</span></label>
+        <p class="field-help">Rows used to induce the hypothesis. Opening the file will let you pick features and the target label.</p>
+        <label class="file-slot" id="trainSlot">
+          <span class="file-slot-icon">⌁</span>
+          <span class="file-slot-text" id="trainText">choose file…</span>
+          <input type="file" id="trainFile" accept=".csv">
+          <button type="button" class="clear-file" data-target="train">✕</button>
+        </label>
+
+        <!-- ratio lives here now -->
+        <div style="margin-top:14px;">
+          <label class="field-label">Split ratio</label>
+          <p class="field-help" id="splitHelpText">Fraction of the training CSV used for training; the rest becomes the test set.</p>
+          <div class="ratio-row" id="splitRow">
+            <input type="number" id="splitRatio" min="0" max="1" step="0.05" value="0.8">
+            <input type="range" id="splitRatioRange" min="0" max="1" step="0.05" value="0.8">
+          </div>
+          <p class="inline-note" id="splitNote">80% train / 20% test</p>
+        </div>
+      </div>
+
+      <!-- 02 test -->
+      <div class="clause">
+        <span class="clause-num">02 — test set</span>
+        <label class="field-label">Test CSV<span class="opt">optional</span></label>
+        <p class="field-help" id="testHelp">If provided, the split ratio above is locked to 1 (no split needed).</p>
+        <label class="file-slot" id="testSlot">
+          <span class="file-slot-icon">⌁</span>
+          <span class="file-slot-text" id="testText">choose file…</span>
+          <input type="file" id="testFile" accept=".csv">
+          <button type="button" class="clear-file" data-target="test">✕</button>
+        </label>
+      </div>
+
+      <!-- 03 background -->
+      <div class="clause">
+        <span class="clause-num">03 — background</span>
+        <label class="field-label">Background rules<span class="opt">optional</span></label>
+        <p class="field-help">An <code>.lp</code> file of ASP facts/rules and <code>%feature</code> directives.</p>
+        <label class="file-slot" id="bgSlot">
+          <span class="file-slot-icon">⌁</span>
+          <span class="file-slot-text" id="bgText">choose file…</span>
+          <input type="file" id="bgFile" accept=".lp,.txt">
+          <button type="button" class="clear-file" data-target="bg">✕</button>
+        </label>
+        <label class="field-label" style="margin-top:16px;">Rule ratio</label>
+        <p class="field-help">Fraction of background rules to draw on when searching.</p>
+        <div class="ratio-row" id="bgRatioRow">
+          <input type="number" id="bgRatio" min="0" max="1" step="0.05" value="1">
+          <input type="range"  id="bgRatioRange" min="0" max="1" step="0.05" value="1">
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="learn" id="learnBtn" disabled>learn hypothesis</button>
+        <div class="status-line" id="statusLine"></div>
+      </div>
+    </div>
+
+    <!-- ===== OUTPUT LISTING ===== -->
+    <div class="listing">
+      <div class="listing-head">
+        <h2><span class="dot" id="statusDot"></span>Hypothesis</h2>
+        <button class="save" id="saveBtn" disabled>save .lp</button>
+      </div>
+
+      <div class="listing-body" id="listingBody">
+        <div class="empty-state">
+          <div class="glyph">:-</div>
+          <p>Nothing derived yet. Select a training set and press <strong style="color:var(--cream)">learn hypothesis</strong> to induce a program.</p>
+        </div>
+      </div>
+
+      <!-- timer -->
+      <div class="timer-bar" id="timerBar">
+        <span class="timer-label">Time elapsed</span>
+        <span class="timer-display" id="timerDisplay">00:00</span>
+      </div>
+
+      <!-- error panel -->
+      <div class="error-panel" id="errorPanel">
+        <div class="error-panel-head">Server / backend error</div>
+        <div class="error-body" id="errorBody"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== CSV COLUMN PICKER MODAL ===== -->
+<div class="modal-backdrop" id="csvModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Configure training data</h3>
+      <span class="modal-sub" id="modalFileName"></span>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- target label -->
+      <div class="label-section">
+        <h4>Selectc Target label (class to predict)</h4>
+        <select class="label-select" id="labelSelect"></select>
+      </div>
+
+      <!-- feature columns -->
+      <div class="features-section">
+        <h4>Feature columns</h4>
+        <table class="feat-table">
+          <thead>
+            <tr>
+              <th>✓</th>
+              <th>Column</th>
+              <th style="text-align:center;">PRESS to select the field type</th>
+            </tr>
+          </thead>
+          <tbody id="featTableBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="modal-cancel" id="modalCancel">cancel</button>
+      <button class="modal-confirm" id="modalConfirm">confirm selection</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+const API_BASE = "http://localhost:5000";
+
+/* ===== THEME ===== */
+const html = document.documentElement;
+const btnDark  = document.getElementById("btnDark");
+const btnLight = document.getElementById("btnLight");
+
+function setTheme(t){
+  html.setAttribute("data-theme", t);
+  btnDark.classList.toggle("active",  t === "dark");
+  btnLight.classList.toggle("active", t === "light");
+}
+btnDark.addEventListener("click",  () => setTheme("dark"));
+btnLight.addEventListener("click", () => setTheme("light"));
+
+/* ===== RATIO PAIRS ===== */
+function syncRatioPair(numEl, rangeEl, onUpdate){
+  numEl.addEventListener("input", () => {
+    let v = parseFloat(numEl.value);
+    if (isNaN(v)) return;
+    v = Math.min(1, Math.max(0, v));
+    rangeEl.value = v;
+    onUpdate(v);
+  });
+  rangeEl.addEventListener("input", () => {
+    numEl.value = rangeEl.value;
+    onUpdate(parseFloat(rangeEl.value));
+  });
+}
+
+const splitRatio      = document.getElementById("splitRatio");
+const splitRatioRange = document.getElementById("splitRatioRange");
+const splitNote       = document.getElementById("splitNote");
+const splitRow        = document.getElementById("splitRow");
+const splitHelpText   = document.getElementById("splitHelpText");
+
+syncRatioPair(splitRatio, splitRatioRange, v => {
+  splitNote.textContent = `${Math.round(v*100)}% train / ${Math.round((1-v)*100)}% test`;
+});
+
+const bgRatio      = document.getElementById("bgRatio");
+const bgRatioRange = document.getElementById("bgRatioRange");
+const bgRatioRow   = document.getElementById("bgRatioRow");
+syncRatioPair(bgRatio, bgRatioRange, () => {});
+
+/* ===== FILE SLOTS ===== */
+function wireFileSlot(inputId, textId, slotId, defaultText, onChange){
+  const input = document.getElementById(inputId);
+  const text  = document.getElementById(textId);
+  const slot  = document.getElementById(slotId);
+  input.addEventListener("change", () => {
+    if (input.files && input.files.length){
+      text.textContent = input.files[0].name;
+      slot.classList.add("has-file");
+    } else {
+      text.textContent = defaultText;
+      slot.classList.remove("has-file");
+    }
+    if (onChange) onChange(input.files && input.files.length ? input.files[0] : null);
+    onFormChange();
+  });
+}
+
+wireFileSlot("trainFile", "trainText", "trainSlot", "choose file…", onTrainFileSelected);
+wireFileSlot("testFile",  "testText",  "testSlot",  "choose file…", null);
+wireFileSlot("bgFile",    "bgText",    "bgSlot",    "choose file…", null);
+
+document.querySelectorAll(".clear-file").forEach(btn => {
+  btn.addEventListener("click", e => {
+    e.preventDefault();
+    const t = btn.dataset.target;
+    const input = document.getElementById(t + "File");
+    const text  = document.getElementById(t + "Text");
+    const slot  = document.getElementById(t + "Slot");
+    input.value = "";
+    text.textContent = "choose file…";
+    slot.classList.remove("has-file");
+    if (t === "train") { csvConfig = null; }
+    onFormChange();
+  });
+});
+
+/* ===== TEST FILE -> LOCK SPLIT RATIO ===== */
+function updateSplitLock(){
+  const testFile = document.getElementById("testFile");
+  const hasTest  = testFile.files && testFile.files.length > 0;
+  if (hasTest){
+    splitRow.classList.add("ratio-disabled");
+    splitRatio.value = 1;
+    splitRatioRange.value = 1;
+    splitNote.textContent = "locked — using provided test set";
+    splitHelpText.textContent = "Locked to 1 because a test CSV is provided.";
+  } else {
+    splitRow.classList.remove("ratio-disabled");
+    const v = parseFloat(splitRatio.value);
+    splitNote.textContent = `${Math.round(v*100)}% train / ${Math.round((1-v)*100)}% test`;
+    splitHelpText.textContent = "Fraction of the training CSV used for training; the rest becomes the test set.";
+  }
+}
+
+/* ===== BG RATIO VISIBILITY ===== */
+function updateBgRatioVisibility(){
+  const bgFile = document.getElementById("bgFile");
+  const hasBg  = bgFile.files && bgFile.files.length > 0;
+  bgRatioRow.classList.toggle("ratio-disabled", !hasBg);
+}
+
+/* ===== FORM STATE ===== */
+const learnBtn  = document.getElementById("learnBtn");
+const trainFile = document.getElementById("trainFile");
+
+function validateForm(){
+  const hasTrain = trainFile.files && trainFile.files.length > 0;
+  learnBtn.disabled = !hasTrain;
+}
+
+function onFormChange(){
+  updateSplitLock();
+  updateBgRatioVisibility();
+  validateForm();
+}
+
+/* ===== CSV COLUMN PICKER ===== */
+let csvConfig = null; // { label, features: [{name, numeric}] }
+
+function onTrainFileSelected(file){
+  if (!file) { csvConfig = null; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const firstLine = text.split(/\r?\n/)[0];
+    const cols = firstLine.split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+    if (cols.length > 0) openCsvModal(cols, file.name);
+  };
+  reader.readAsText(file);
+}
+
+const csvModal   = document.getElementById("csvModal");
+const labelSel   = document.getElementById("labelSelect");
+const featTbody  = document.getElementById("featTableBody");
+const modalFile  = document.getElementById("modalFileName");
+const modalClose = document.getElementById("modalClose");
+const modalCancel= document.getElementById("modalCancel");
+const modalConfirm=document.getElementById("modalConfirm");
+
+let pendingCols = [];
+
+function openCsvModal(cols, filename){
+  pendingCols = cols;
+  modalFile.textContent = filename;
+
+  // populate label dropdown
+  labelSel.innerHTML = "";
+  cols.forEach((c,i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = c;
+    if (i === cols.length - 1) opt.selected = true;
+    labelSel.appendChild(opt);
+  });
+
+  renderFeatTable();
+  csvModal.classList.add("open");
+}
+
+labelSel.addEventListener("change", renderFeatTable);
+
+function renderFeatTable(){
+  const labelIdx = parseInt(labelSel.value);
+  featTbody.innerHTML = "";
+
+  pendingCols.forEach((col, i) => {
+    const isLabel = i === labelIdx;
+    const tr = document.createElement("tr");
+
+    // checkbox cell
+    const tdCb = document.createElement("td");
+    tdCb.className = "cb-wrap";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id   = `col_cb_${i}`;
+    cb.checked = !isLabel;
+    cb.disabled = isLabel;
+    tdCb.appendChild(cb);
+
+    // name cell
+    const tdName = document.createElement("td");
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "feat-name" + (isLabel ? " is-label" : "");
+    nameSpan.textContent = col + (isLabel ? "  ← label" : "");
+    tdName.appendChild(nameSpan);
+
+    // numeric toggle cell
+    const tdNum = document.createElement("td");
+    tdNum.className = "num-toggle-wrap";
+    const numBtn = document.createElement("button");
+    numBtn.className = "num-toggle numeric"; // default: numeric
+    numBtn.textContent = "numeric";
+    numBtn.disabled = isLabel;
+    numBtn.dataset.numeric = "1";
+    numBtn.addEventListener("click", () => {
+      const isNum = numBtn.dataset.numeric === "1";
+      numBtn.dataset.numeric = isNum ? "0" : "1";
+      numBtn.textContent = isNum ? "categorical" : "numeric";
+      numBtn.classList.toggle("numeric", !isNum);
+    });
+    tdNum.appendChild(numBtn);
+
+    tr.appendChild(tdCb);
+    tr.appendChild(tdName);
+    tr.appendChild(tdNum);
+    featTbody.appendChild(tr);
+  });
+}
+
+function closeModal(){ csvModal.classList.remove("open"); }
+
+modalClose.addEventListener("click",  closeModal);
+modalCancel.addEventListener("click", closeModal);
+csvModal.addEventListener("click", e => { if (e.target === csvModal) closeModal(); });
+
+modalConfirm.addEventListener("click", () => {
+  const labelIdx = parseInt(labelSel.value);
+  const rows = featTbody.querySelectorAll("tr");
+  const features = [];
+
+  rows.forEach((tr, i) => {
+    if (i === labelIdx) return;
+    const cb  = tr.querySelector("input[type=checkbox]");
+    if (!cb.checked) return;
+    const btn = tr.querySelector(".num-toggle");
+    features.push({ name: pendingCols[i], numeric: btn.dataset.numeric === "1" });
+  });
+
+  csvConfig = { label: pendingCols[labelIdx], features };
+  closeModal();
+
+  // update the tagline under the slot
+  const trainText = document.getElementById("trainText");
+  const f = document.getElementById("trainFile").files[0];
+  if (f) {
+    const numF = features.length;
+    trainText.textContent = `${f.name}  [${numF} feature${numF!==1?'s':''}  ·  label: ${csvConfig.label}]`;
+  }
+});
+
+/* ===== TIMER ===== */
+let timerInterval = null;
+let timerStart    = null;
+
+const timerDisplay = document.getElementById("timerDisplay");
+
+function startTimer(){
+  timerStart = Date.now();
+  timerDisplay.textContent = "00:00";
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+    const mm = String(Math.floor(elapsed / 60)).padStart(2,"0");
+    const ss = String(elapsed % 60).padStart(2,"0");
+    timerDisplay.textContent = `${mm}:${ss}`;
+  }, 1000);
+}
+
+function stopTimer(){
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+/* ===== STATUS & OUTPUT ===== */
+const statusLine  = document.getElementById("statusLine");
+const statusDot   = document.getElementById("statusDot");
+const listingBody = document.getElementById("listingBody");
+const saveBtn     = document.getElementById("saveBtn");
+const errorPanel  = document.getElementById("errorPanel");
+const errorBody   = document.getElementById("errorBody");
+
+let currentHypothesis = "";
+
+function setStatus(msg, kind){
+  statusLine.textContent = msg;
+  statusLine.className   = "status-line" + (kind ? " " + kind : "");
+}
+
+function showError(msg){
+  if (!msg){ errorPanel.classList.remove("visible"); return; }
+  errorBody.textContent = msg;
+  errorPanel.classList.add("visible");
+}
+
+function hideError(){
+  errorPanel.classList.remove("visible");
+  errorBody.textContent = "";
+}
+
+function classifyLine(line){
+  const t = line.trim();
+  if (t.startsWith("%"))    return "code-comment";
+  if (t.includes(":-"))     return "code-head";
+  return "code-body";
+}
+
+function renderHypothesis(text){
+  currentHypothesis = text;
+  listingBody.innerHTML = "";
+
+  if (!text || !text.trim()){
+    listingBody.innerHTML = `
+      <div class="empty-state">
+        <div class="glyph">∅</div>
+        <p>The search returned no clauses satisfying the ratio constraints.</p>
+      </div>`;
+    saveBtn.disabled = true;
+    return;
+  }
+
+  text.split("\n").forEach((line, i) => {
+    const row  = document.createElement("div");
+    row.className = "clause-line";
+
+    const ln   = document.createElement("span");
+    ln.className = "ln" + (line.trim() === "" ? " blank" : "");
+    ln.textContent = line.trim() === "" ? "·" : String(i+1).padStart(2,"0");
+
+    const code = document.createElement("span");
+    code.className = classifyLine(line);
+    code.textContent = line.replace(/:-/g, " :- ");
+
+    row.appendChild(ln);
+    row.appendChild(code);
+    listingBody.appendChild(row);
+  });
+
+  saveBtn.disabled = false;
+}
+
+/* ===== LEARN ===== */
+learnBtn.addEventListener("click", async () => {
+  if (!trainFile.files.length) return;
+
+  const hasTest  = document.getElementById("testFile").files.length > 0;
+  const hasBg    = document.getElementById("bgFile").files.length   > 0;
+  const testFile = document.getElementById("testFile");
+  const bgFile   = document.getElementById("bgFile");
+
+  const fd = new FormData();
+  fd.append("train_csv", trainFile.files[0]);
+  if (hasTest) fd.append("test_csv",    testFile.files[0]);
+  else         fd.append("split_ratio", splitRatio.value);
+  if (hasBg)   fd.append("bg_rules",   bgFile.files[0]);
+  fd.append("bg_ratio", bgRatio.value);
+
+  // attach column config if available
+  if (csvConfig){
+    fd.append("label",    csvConfig.label);
+    fd.append("features", JSON.stringify(csvConfig.features));
+  }
+
+  learnBtn.disabled = true;
+  statusDot.classList.add("live");
+  setStatus("running…");
+  hideError();
+  listingBody.innerHTML = `<div class="empty-state"><div class="glyph"><span class="spinner"></span></div><p>Deriving a hypothesis from the training set…</p></div>`;
+  startTimer();
+
+  try {
+    const res = await fetch(API_BASE + "/api/learn", { method: "POST", body: fd });
+
+    if (!res.ok){
+      const errText = await res.text();
+      throw new Error(errText || `server responded ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data.error){ showError(data.error); }
+    renderHypothesis(data.hypothesis || "");
+    setStatus(`done — ${data.meta || "hypothesis derived"}`, "ok");
+
+  } catch (err) {
+    showError(err.message);
+    setStatus("failed", "err");
+    listingBody.innerHTML = `
+      <div class="empty-state">
+        <div class="glyph">✕</div>
+        <p>Could not reach the learner. Make sure the local server is running (<code style="color:var(--red)">python server.py</code>) and try again.</p>
+      </div>`;
+  } finally {
+    stopTimer();
+    statusDot.classList.remove("live");
+    validateForm();
+  }
+});
+
+/* ===== SAVE ===== */
+saveBtn.addEventListener("click", () => {
+  if (!currentHypothesis) return;
+  const blob = new Blob([currentHypothesis], { type: "text/plain" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "hypothesis.lp";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// init
+onFormChange();
+
+})();
+</script>
+</body>
+</html>

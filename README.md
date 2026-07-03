@@ -23,7 +23,7 @@ This branch extends the original CUD@ILP implementation with more GPU accelerati
 ## Usage
 
 CUD@ILP<sup>2</sup> can be used in the same way as the original FOLD-RM implementation (without background rules).
-Additionally a GUI can be used.
+Additionally a web-interface can be used (open interface.html).
 
 ### Serial Training
 
@@ -39,21 +39,6 @@ model.fitGPU(...)
 
 ---
 
-## Testing
+### Testing
 
-The `Run_tests.py` script provides a simple benchmark for comparing the serial and CUDA implementations.
-
-The script:
-
-1. Trains a model using the original serial implementation (`model.fit`).
-2. Trains the same model using the CUDA implementation (`model.fitGPU`).
-3. Measures and compares execution times.
-4. Verifies that both implementations produce the same learned hypothesis.
-
-Since the datasets are currently split deterministically into training and testing sets, the hypotheses produced by the serial and CUDA versions should be identical.
-
----
-
-## Notes
-
-* The testing framework is intentionally lightweight and primarily intended for development and validation.
+The the results obtained in the paper can be replicated via the script `Run_tests.py`.

@@ -63,7 +63,7 @@ def cover(item, x):
 
 
 def classify(items, x, model):
-    print("x ",x)
+    #print("x ",x)
     
     #bg_rules=(rex.rules,rex.facts,pred_stratum)
     
@@ -71,7 +71,7 @@ def classify(items, x, model):
     
     if(model.pred_names is not None):
     
-        print("pred_names_col ", model.pred_names)
+        #print("pred_names_col ", model.pred_names)
 
         for i in range(len(model.pred_names)):
             value_extracted=x[i]
@@ -85,7 +85,7 @@ def classify(items, x, model):
 
         answer_set = evaluate_asp(model.bg_rules[0], facts, model.bg_rules[2])
 
-        print("answer_set "+str(answer_set))
+        #print("answer_set "+str(answer_set))
         list_to_add=[]
 
         for d in model.feature_directives:
@@ -120,8 +120,7 @@ def classify(items, x, model):
 
         x[-1:-1]=list_to_add
 
-        print("x ADDED : "+str(x))
-        print("facts: "+str(facts))
+        #print("x ADDED : "+str(x))
     for i in items:
         if evaluate(i, x):
             return i[0][2]

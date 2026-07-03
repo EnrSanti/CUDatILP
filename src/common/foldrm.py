@@ -26,9 +26,7 @@ class Classifier:
             data, self.attrs = load_data(file, self.attrs, self.label, self.numeric, amount)
         else:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
-        print("here: \n")
-        print(data)
-        print(self.attrs)
+        
         return data
     
     def fit(self, data, ratio=0.5):

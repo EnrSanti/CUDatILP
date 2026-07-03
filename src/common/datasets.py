@@ -3558,12 +3558,11 @@ def two_circles():
 
 def sigmoid():
     attrs = ['x','y']
-    ret_attrs=attrs.copy()
-    nums = attrs
+    nums = attrs.copy() #IMPORTANTE SIA CPy
     model = Classifier(attrs=attrs, numeric=nums, label='class')
     data = model.load_data('../nuovi_task/sigmoid_25000.csv')
     print('\n% weight lifting dataset', np.shape(data))
-    return model, data, ret_attrs
+    return model, data
 
 def shape_volume():
     attrs = ['base_parameter','height','volume']
