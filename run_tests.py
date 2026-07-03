@@ -430,7 +430,7 @@ def bg_comparison():
     data_train, data_test = split_data(data, ratio=0.8)
 
     start = timer()
-    model.fitGPU(data_train,bg_file=None,col_names=col_names,ratio=0.5)
+    model.fitGPU(data_train,bg_file="data/bg_sigmoid.lp",col_names=col_names,ratio=0.5)
     end = timer()
     
     model.print_asp(simple=True)

@@ -1104,8 +1104,11 @@ def add_background(filename,data,model):
                 if candidates:
                     if d.agg == "MIN":
                         list_to_add.append(min(candidates))
-                    else:  # MAX
+                    elif d.agg =="MAX":  # MAX
                         list_to_add.append(max(candidates))
+                    elif d.agg == "ALL":
+                        pass
+                        #TODO list_to_add.append(candidates)
                 else:
                     # predicate not found in this row's answer set:
                     # fall back to the user-specified default
