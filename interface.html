@@ -570,24 +570,45 @@ button.save:disabled { border-color: var(--line); color: var(--cream-dim); curso
   align-items: center;
   justify-content: center;
 }
-.num-toggle {
-  font-size: 11px;
-  font-family: 'Space Mono', monospace;
-  border-radius: 3px;
-  border: 1px solid var(--line);
-  background: var(--panel-raised);
-  color: var(--cream-dim);
-  padding: 4px 8px;
+/* toggle switch */
+.sw-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   cursor: pointer;
-  transition: all .15s;
-  white-space: nowrap;
+  user-select: none;
 }
-.num-toggle.numeric {
-  border-color: var(--teal);
-  color: var(--teal);
-  background: rgba(111,166,154,0.08);
+.sw-label input[type=checkbox] { display: none; }
+.sw-track {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--line);
+  position: relative;
+  transition: background .2s;
+  flex-shrink: 0;
 }
-.num-toggle:disabled { opacity: 0.35; cursor: not-allowed; }
+.sw-label input:checked ~ .sw-track { background: var(--teal); }
+.sw-thumb {
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.sw-label input:checked ~ .sw-track .sw-thumb { transform: translateX(16px); }
+.sw-label.is-disabled { opacity: 0.3; pointer-events: none; }
+.sw-text {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--cream-dim);
+  transition: color .2s;
+  min-width: 22px;
+}
+.sw-label input:checked ~ .sw-text { color: var(--teal); }
 
 .modal-footer {
   padding: 16px 24px;
@@ -716,14 +737,14 @@ button.modal-confirm:hover { opacity: .85; }
 
       <div class="listing-body" id="listingBody">
         <div class="empty-state">
-          <div class="glyph">:-</div>
-          <p>Nothing derived yet. Select a training set and press <strong style="color:var(--cream)">learn hypothesis</strong> to induce a program.</p>
+          <div class="glyph">∴</div>
+          <p>Nothing derived yet. Set a training set and press <strong style="color:var(--cream)">learn hypothesis</strong> to induce a program.</p>
         </div>
       </div>
 
       <!-- timer -->
       <div class="timer-bar" id="timerBar">
-        <span class="timer-label">Time elapsed</span>
+        <span class="timer-label">elapsed</span>
         <span class="timer-display" id="timerDisplay">00:00</span>
       </div>
 
@@ -749,7 +770,7 @@ button.modal-confirm:hover { opacity: .85; }
 
       <!-- target label -->
       <div class="label-section">
-        <h4>Selectc Target label (class to predict)</h4>
+        <h4>Target label (class to predict)</h4>
         <select class="label-select" id="labelSelect"></select>
       </div>
 
@@ -761,7 +782,7 @@ button.modal-confirm:hover { opacity: .85; }
             <tr>
               <th>✓</th>
               <th>Column</th>
-              <th style="text-align:center;">PRESS to select the field type</th>
+              <th style="text-align:center; font-weight:600; color:var(--cream-dim);">Numeric?</th>
             </tr>
           </thead>
           <tbody id="featTableBody"></tbody>
@@ -971,21 +992,30 @@ function renderFeatTable(){
     nameSpan.textContent = col + (isLabel ? "  ← label" : "");
     tdName.appendChild(nameSpan);
 
-    // numeric toggle cell
+    // numeric toggle switch
     const tdNum = document.createElement("td");
     tdNum.className = "num-toggle-wrap";
-    const numBtn = document.createElement("button");
-    numBtn.className = "num-toggle numeric"; // default: numeric
-    numBtn.textContent = "numeric";
-    numBtn.disabled = isLabel;
-    numBtn.dataset.numeric = "1";
-    numBtn.addEventListener("click", () => {
-      const isNum = numBtn.dataset.numeric === "1";
-      numBtn.dataset.numeric = isNum ? "0" : "1";
-      numBtn.textContent = isNum ? "categorical" : "numeric";
-      numBtn.classList.toggle("numeric", !isNum);
+    const swLabel = document.createElement("label");
+    swLabel.className = "sw-label" + (isLabel ? " is-disabled" : "");
+    const swCb = document.createElement("input");
+    swCb.type = "checkbox";
+    swCb.checked = !isLabel; // label column is always categorical (false)
+    swCb.disabled = isLabel;
+    const swTrack = document.createElement("span");
+    swTrack.className = "sw-track";
+    const swThumb = document.createElement("span");
+    swThumb.className = "sw-thumb";
+    swTrack.appendChild(swThumb);
+    const swText = document.createElement("span");
+    swText.className = "sw-text";
+    swText.textContent = isLabel ? "no" : "yes";
+    swCb.addEventListener("change", () => {
+      swText.textContent = swCb.checked ? "yes" : "no";
     });
-    tdNum.appendChild(numBtn);
+    swLabel.appendChild(swCb);
+    swLabel.appendChild(swTrack);
+    swLabel.appendChild(swText);
+    tdNum.appendChild(swLabel);
 
     tr.appendChild(tdCb);
     tr.appendChild(tdName);
@@ -1009,8 +1039,8 @@ modalConfirm.addEventListener("click", () => {
     if (i === labelIdx) return;
     const cb  = tr.querySelector("input[type=checkbox]");
     if (!cb.checked) return;
-    const btn = tr.querySelector(".num-toggle");
-    features.push({ name: pendingCols[i], numeric: btn.dataset.numeric === "1" });
+    const swCb = tr.querySelector(".sw-label input[type=checkbox]");
+    features.push({ name: pendingCols[i], numeric: swCb ? swCb.checked : true });
   });
 
   csvConfig = { label: pendingCols[labelIdx], features };
