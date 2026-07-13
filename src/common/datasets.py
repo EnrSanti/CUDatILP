@@ -3560,7 +3560,7 @@ def sigmoid():
     attrs = ['x','y']
     nums = attrs.copy() #IMPORTANTE SIA CPy
     model = Classifier(attrs=attrs, numeric=nums, label='class')
-    data = model.load_data('../nuovi_task/sigmoid_25000.csv')
+    data = model.load_data('data/two_lines_3000.csv')
     print('\n% weight lifting dataset', np.shape(data))
     return model, data
 
