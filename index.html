@@ -688,6 +688,18 @@ button.modal-confirm:hover { opacity: .85; }
           </div>
           <p class="inline-note" id="splitNote">80% train / 20% test</p>
         </div>
+
+        <!-- Rule ratio -->
+        <div style="margin-top:18px;">
+            <label class="field-label">Rule ratio</label>
+            <p class="field-help">
+                The ratio of training examples that are part of the exception to the examples implied only by the default conclusion of the rule.
+            </p>
+            <div class="ratio-row" id="bgRatioRow">
+                <input type="number" id="bgRatio" min="0" max="1" step="0.05" value="1">
+                <input type="range" id="bgRatioRange" min="0" max="1" step="0.05" value="1">
+            </div>
+        </div>
       </div>
 
       <!-- 02 test -->
@@ -714,12 +726,6 @@ button.modal-confirm:hover { opacity: .85; }
           <input type="file" id="bgFile" accept=".lp,.txt">
           <button type="button" class="clear-file" data-target="bg">✕</button>
         </label>
-        <label class="field-label" style="margin-top:16px;">Rule ratio</label>
-        <p class="field-help">Fraction of background rules to draw on when searching.</p>
-        <div class="ratio-row" id="bgRatioRow">
-          <input type="number" id="bgRatio" min="0" max="1" step="0.05" value="1">
-          <input type="range"  id="bgRatioRange" min="0" max="1" step="0.05" value="1">
-        </div>
       </div>
 
       <div class="action-row">
@@ -737,8 +743,8 @@ button.modal-confirm:hover { opacity: .85; }
 
       <div class="listing-body" id="listingBody">
         <div class="empty-state">
-          <div class="glyph">∴</div>
-          <p>Nothing derived yet. Set a training set and press <strong style="color:var(--cream)">learn hypothesis</strong> to induce a program.</p>
+          <div class="glyph">:-</div>
+          <p>Nothing derived yet. Load a training set and press <strong style="color:var(--cream)">learn hypothesis</strong>.</p>
         </div>
       </div>
 
@@ -900,13 +906,6 @@ function updateSplitLock(){
   }
 }
 
-/* ===== BG RATIO VISIBILITY ===== */
-function updateBgRatioVisibility(){
-  const bgFile = document.getElementById("bgFile");
-  const hasBg  = bgFile.files && bgFile.files.length > 0;
-  bgRatioRow.classList.toggle("ratio-disabled", !hasBg);
-}
-
 /* ===== FORM STATE ===== */
 const learnBtn  = document.getElementById("learnBtn");
 const trainFile = document.getElementById("trainFile");
@@ -918,7 +917,6 @@ function validateForm(){
 
 function onFormChange(){
   updateSplitLock();
-  updateBgRatioVisibility();
   validateForm();
 }
 
