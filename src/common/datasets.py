@@ -3564,6 +3564,15 @@ def sigmoid():
     print('\n% weight lifting dataset', np.shape(data))
     return model, data
 
+def satellite():
+    attrs = ['altitude', 'velocity', 'eccentricity', 'mass', 'nearest_distance', 'relative_velocity', 'debris_density']
+    nums = attrs.copy() #IMPORTANTE SIA CPy
+    model = Classifier(attrs=attrs, numeric=nums, label='class')
+    data = model.load_data('data/satellite_ilp_dataset.csv')
+    print('\n% weight lifting dataset', np.shape(data))
+    return model, data
+
+
 def shape_volume():
     attrs = ['base_parameter','height','volume']
     nums = attrs

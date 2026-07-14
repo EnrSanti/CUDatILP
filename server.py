@@ -164,6 +164,7 @@ def api_learn():
         start = timer()
 
         fit_kwargs = dict(col_names=model.attrs, ratio=bg_ratio)
+        print("ratio-----> ",str(bg_ratio))
         if has_bg:
             fit_kwargs["bg_file"] = tmp_bg
 

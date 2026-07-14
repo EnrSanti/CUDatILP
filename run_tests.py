@@ -440,11 +440,25 @@ def bg_comparison():
     acc = get_scores(Y_test_hat, data_test)
     print('% acc', round(acc, 4), '# rules', len(model.crs))
 
+def sat():
+    model, data = satellite()#two_lines()
+    data_train, data_test = split_data(data, ratio=0.8)
+
+    start = timer()
+    model.fitGPU(data_train,bg_file="data/bg_sat.lp",col_names=model.attrs,ratio=0.5)
+    end = timer()
+    
+    model.print_asp(simple=True)
+    Y = [d[-1] for d in data_test]
+    #print("data_test: "+str(data_test))
+    Y_test_hat = model.predict(data_test)
+    acc = get_scores(Y_test_hat, data_test)
+    print('% acc', round(acc, 4), '# rules', len(model.crs))
 def main():
     
     #fast_check()
     #compare_times()
-    bg_comparison()
+    sat()
 
 if __name__ == '__main__':
     main()

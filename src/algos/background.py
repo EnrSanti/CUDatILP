@@ -355,8 +355,11 @@ class RuleExtractor:
 
         if t == ast.ASTType.UnaryOperation:
             inner = self.term_to_value(term.argument)
-            if term.operator_type == ast.UnaryOperator.Minus and isinstance(inner, (int, float)):
-                return -inner
+            if term.operator_type == ast.UnaryOperator.Minus:
+                if isinstance(inner, (int, float)):
+                    return -inner
+                # variable or deferred expr: defer negation as multiplication by -1
+                return ("expr", ast.BinaryOperator.Multiplication, -1, inner)
             raise ValueError(f"Unsupported unary operation: {term}")
 
         if t == ast.ASTType.BinaryOperation:
@@ -368,7 +371,7 @@ class RuleExtractor:
             left = self.term_to_value(term.left)
             right = self.term_to_value(term.right)
 
-            if is_var(left) or is_var(right):
+            if is_var(left) or is_var(right) or isinstance(left, tuple) or isinstance(right, tuple):
                 # depends on a runtime binding -> defer to evaluation
                 return ("expr", op, left, right)
 
