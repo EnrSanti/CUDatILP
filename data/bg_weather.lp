@@ -1,18 +1,12 @@
-
 humidity_index(HI) :-
     humidity(H),
     temperature(T),
     HI = H*T/100.
 
-
-
 cloud_density(CD) :-
     cloud_cover(C),
     humidity(H),
     CD = C*H/100.
-
-
-
 
 thermal_instability(TI) :-
     temperature_change( DT),
@@ -20,21 +14,17 @@ thermal_instability(TI) :-
     DT >= 0,
     TI = DT*H.
 
-
 thermal_instability(TI) :-
     temperature_change( DT),
     humidity( H),
     DT < 0,
     TI = (- DT)*H.
 
-
-
 cloud_instability( CI) :-
     cloud_density( CD),
     pressure_change( DP),
     DP >= 0,
     CI = CD*DP.
-
 
 cloud_instability( CI) :-
     cloud_density( CD),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-server.py  –  CUD@ILP² backend
+server.py  –  CUD@LP² backend
 Serves index.html at / AND the /api/learn endpoint.
 
 Usage:
@@ -19,7 +19,9 @@ import sys
 import tempfile
 import traceback
 from timeit import default_timer as timer
-
+import threading
+import webbrowser
+import time
 import numpy as np
 from flask import Flask, jsonify, request, send_from_directory
 from flask.json.provider import DefaultJSONProvider
@@ -227,14 +229,24 @@ def api_learn():
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
+def open_browser(host, port):
+    # Give Flask a moment to start
+    webbrowser.open(f"http://{host}:{port}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="CUD@ILP² backend")
+    parser = argparse.ArgumentParser(description="CUD@LP² backend")
     parser.add_argument("--port",  type=int, default=5000)
     parser.add_argument("--host",  default="127.0.0.1",
                         help="use 0.0.0.0 to expose on the local network")
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
+    
+    threading.Thread(
+        target=open_browser,
+        args=(args.host, args.port),
+        daemon=True
+    ).start()
 
-    print(f"\n  CUD@ILP² :-  →  http://{args.host}:{args.port}\n")
+    app.run(host=args.host, port=args.port, debug=args.debug)
+    print(f"\n  CUD@LP² :-  →  http://{args.host}:{args.port}\n")
     app.run(host=args.host, port=args.port, debug=args.debug)

@@ -9,21 +9,21 @@ By learning default rules together with their exceptions, FOLD-RM generates comp
 CUD@ILP<sup>2</sup> provides a significative speedup over FOLD-RM, it supports the addition of user defined background rules (in Clingo syntax) and is able to summarize the hypothesis in natuaral language. 
 
 <p align="center">
-  <img src="./results/git_img.png" width="300" alt="CUD@ILP Results">
+  <img src="./results/git_img.png" width="200" alt="CUD@ILP Results">
 </p>
 
 ## Repository Overview
 
 This branch extends the original CUD@ILP implementation with more GPU acceleration and additional experimental features.
 
-**Average Speedup with respect to FOLD-RM: 19.7×**
+**Average Speedup with respect to FOLD-RM: 20×**
 
 ---
 
 ## Usage
 
 CUD@ILP<sup>2</sup> can be used in the same way as the original FOLD-RM implementation (without background rules).
-Additionally a web-interface can be used (open interface.html).
+Additionally a web-interface can be used.
 
 ### Serial Training
 
@@ -36,6 +36,14 @@ model.fit(...)
 ```python
 model.fitGPU(...)
 ```
+#### To add background rules, a background file must be specified.
+
+### Interface (CUDA training only)
+
+Run interface_server.py, it will init a local Flask server and open a browser based interface for CUD@ILP<sup>2</sup>.
+<p align="center">
+  <img src="./results/interface.png" width="500" alt="CUD@ILP Results">
+</p>
 
 ---
 

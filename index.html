@@ -37,7 +37,11 @@
   --overlay:     rgba(0,0,0,0.30);
   --shadow:      0 8px 32px rgba(0,0,0,0.15);
 }
-
+[data-theme="light"] .code-head,
+[data-theme="light"] .code-body,
+[data-theme="light"] .code-neck {
+    color: var(--cream);
+}
 *{ box-sizing: border-box; }
 
 body {
@@ -658,7 +662,7 @@ button.modal-confirm:hover { opacity: .85; }
       <button id="btnLight" class="">light</button>
     </div>
   </header>
-  <p class="tagline">Local hypothesis induction over background ASP rules. Point it at a dataset, derive a program, keep what holds. Runs against <code>localhost:5000</code>.</p>
+  <p class="tagline">Local hypothesis induction over background ASP rules. </p>
 
   <div class="grid">
 
