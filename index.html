@@ -42,6 +42,7 @@
 [data-theme="light"] .code-neck {
     color: var(--cream);
 }
+
 *{ box-sizing: border-box; }
 
 body {
@@ -215,6 +216,28 @@ label.field-label {
 }
 .file-slot.has-file .clear-file { display: inline-block; }
 .clear-file:hover { color: var(--red); }
+
+/* ===== DETERMINISTIC SPLIT ROW ===== */
+.det-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  transition: opacity .2s;
+}
+.det-row.locked { opacity: 0.35; pointer-events: none; }
+.det-label {
+  font-size: 12px;
+  color: var(--cream-dim);
+  font-family: 'IBM Plex Sans', sans-serif;
+  line-height: 1.4;
+  flex: 1;
+}
 
 /* ===== RATIO ROW ===== */
 .ratio-row {
@@ -691,6 +714,14 @@ button.modal-confirm:hover { opacity: .85; }
             <input type="range" id="splitRatioRange" min="0" max="1" step="0.05" value="0.8">
           </div>
           <p class="inline-note" id="splitNote">80% train / 20% test</p>
+
+        <div class="det-row" id="detRow">
+          <span class="det-label">split data deterministically for test replicability</span>
+          <label class="sw-label" id="detSwLabel">
+            <input type="checkbox" id="detSwitch">
+            <span class="sw-track"><span class="sw-thumb"></span></span>
+            <span class="sw-text" id="detSwText">no</span>
+          </label>
         </div>
 
         <!-- Rule ratio -->
@@ -703,6 +734,7 @@ button.modal-confirm:hover { opacity: .85; }
                 <input type="number" id="bgRatio" min="0" max="1" step="0.05" value="1">
                 <input type="range" id="bgRatioRange" min="0" max="1" step="0.05" value="1">
             </div>
+        </div>
         </div>
       </div>
 
@@ -730,6 +762,7 @@ button.modal-confirm:hover { opacity: .85; }
           <input type="file" id="bgFile" accept=".lp,.txt">
           <button type="button" class="clear-file" data-target="bg">✕</button>
         </label>
+
       </div>
 
       <div class="action-row">
@@ -748,7 +781,7 @@ button.modal-confirm:hover { opacity: .85; }
       <div class="listing-body" id="listingBody">
         <div class="empty-state">
           <div class="glyph">:-</div>
-          <p>Nothing derived yet. Load a training set and press <strong style="color:var(--cream)">learn hypothesis</strong>.</p>
+          <p>Nothing derived yet. Set a training set and press <strong style="color:var(--cream)">learn hypothesis</strong> to induce a program.</p>
         </div>
       </div>
 
@@ -810,7 +843,7 @@ button.modal-confirm:hover { opacity: .85; }
 <script>
 (function(){
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = "";  // served by the same Flask process
 
 /* ===== THEME ===== */
 const html = document.documentElement;
@@ -852,7 +885,6 @@ syncRatioPair(splitRatio, splitRatioRange, v => {
 
 const bgRatio      = document.getElementById("bgRatio");
 const bgRatioRange = document.getElementById("bgRatioRange");
-const bgRatioRow   = document.getElementById("bgRatioRow");
 syncRatioPair(bgRatio, bgRatioRange, () => {});
 
 /* ===== FILE SLOTS ===== */
@@ -893,6 +925,14 @@ document.querySelectorAll(".clear-file").forEach(btn => {
 });
 
 /* ===== TEST FILE -> LOCK SPLIT RATIO ===== */
+const detRow    = document.getElementById("detRow");
+const detSwitch = document.getElementById("detSwitch");
+const detSwText = document.getElementById("detSwText");
+
+detSwitch.addEventListener("change", () => {
+  detSwText.textContent = detSwitch.checked ? "yes" : "no";
+});
+
 function updateSplitLock(){
   const testFile = document.getElementById("testFile");
   const hasTest  = testFile.files && testFile.files.length > 0;
@@ -902,11 +942,13 @@ function updateSplitLock(){
     splitRatioRange.value = 1;
     splitNote.textContent = "locked — using provided test set";
     splitHelpText.textContent = "Locked to 1 because a test CSV is provided.";
+    detRow.classList.add("locked");
   } else {
     splitRow.classList.remove("ratio-disabled");
     const v = parseFloat(splitRatio.value);
     splitNote.textContent = `${Math.round(v*100)}% train / ${Math.round((1-v)*100)}% test`;
     splitHelpText.textContent = "Fraction of the training CSV used for training; the rest becomes the test set.";
+    detRow.classList.remove("locked");
   }
 }
 
@@ -1163,6 +1205,9 @@ learnBtn.addEventListener("click", async () => {
   if (hasBg)   fd.append("bg_rules",   bgFile.files[0]);
   fd.append("bg_ratio", bgRatio.value);
 
+  // deterministic split
+  fd.append("deterministic_split", (!hasTest && detSwitch.checked).toString());
+
   // attach column config if available
   if (csvConfig){
     fd.append("label",    csvConfig.label);
@@ -1224,4 +1269,4 @@ onFormChange();
 })();
 </script>
 </body>
-</html>\
+</html>

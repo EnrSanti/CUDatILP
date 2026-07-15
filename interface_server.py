@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-server.py  –  CUD@LP² backend
+server.py  –  CUD@ILP² backend
 Serves index.html at / AND the /api/learn endpoint.
 
 Usage:
@@ -22,6 +22,7 @@ from timeit import default_timer as timer
 import threading
 import webbrowser
 import time
+
 import numpy as np
 from flask import Flask, jsonify, request, send_from_directory
 from flask.json.provider import DefaultJSONProvider
@@ -37,7 +38,6 @@ class NumpySafeProvider(DefaultJSONProvider):
 # ── project imports ────────────────────────────────────────────────────────────
 # Adjust if server.py lives outside the project root.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 
 from src.common.foldrm import *
 from src.common.datasets import *
@@ -160,13 +160,16 @@ def api_learn():
         if has_test:
             data_test = model.load_data(tmp_test)
         else:
-            data_train, data_test = split_data(data_train, ratio=split_ratio)
+            deterministic = request.form.get("deterministic_split", "false").lower() == "true"
+            if deterministic:
+                data_train, data_test = split_data_deterministically(data_train, ratio=split_ratio)
+            else:
+                data_train, data_test = split_data(data_train, ratio=split_ratio)
 
         # 4. fit ───────────────────────────────────────────────────────────────
         start = timer()
 
         fit_kwargs = dict(col_names=model.attrs, ratio=bg_ratio)
-        print("ratio-----> ",str(bg_ratio))
         if has_bg:
             fit_kwargs["bg_file"] = tmp_bg
 
@@ -227,6 +230,8 @@ def api_learn():
     finally:
         _cleanup(tmp_train, tmp_test, tmp_bg)
 
+
+# ── entry point ───────────────────────────────────────────────────────────────
 
 # ── entry point ───────────────────────────────────────────────────────────────
 def open_browser(host, port):
