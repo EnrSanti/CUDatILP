@@ -1,8 +1,6 @@
 # CUD@ILP <sup>2</sup>
 
-<table>
-<tr>
-<td valign="top" style="border: none;">
+<img src="./results/git_img.png" width="200" align="right" hspace="20" vspace="5" alt="CUD@ILP Results">
 
 **CUD@ILP²** is a CUDA-accelerated extension of the **CUD@ILP (FOLD-RM)** algorithm for binary and multiclass classification tasks.
 
@@ -12,12 +10,7 @@ By learning default rules together with their exceptions, FOLD-RM generates comp
 
 CUD@ILP² provides a significative speedup over FOLD-RM, supports the addition of user-defined background rules (in Clingo syntax), and is able to summarize the hypothesis in natural language.
 
-</td>
-<td valign="top" align="center" style="border: none; width: 220px;">
-  <img src="./results/git_img.png" width="250" alt="CUD@ILP Results">
-</td>
-</tr>
-</table>
+<br clear="right"/>
 
 ## Repository Overview
 

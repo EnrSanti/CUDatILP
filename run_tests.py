@@ -37,7 +37,7 @@ def run_test_split(test_func,name,ratio):
     model,data_train, data_test = test_func()  #c.a. 6 min e 30 a 0.2 di ratio
 
     start_gpu = timer()
-    model.fitGPU(data_train, ratio=ratio)
+    model.fitGPU(data_train,bg_file=None, col_names=model.attrs, ratio=ratio)
     end_gpu = timer()
 
 
@@ -109,7 +109,8 @@ def run_test_to_split_ds(test_func,name, ratio,ds_ratio):
     data_train, data_test = split_data_deterministically(data, ratio=ds_ratio)
 
     start_gpu = timer()
-    model.fitGPU(data_train, ratio=ratio)
+
+    model.fitGPU(data_train,bg_file=None, col_names=model.attrs,ratio=ratio)
     end_gpu = timer()
 
     h_gpu=model.get_asp(simple=True)
@@ -457,8 +458,8 @@ def sat():
 def main():
     
     #fast_check()
-    #compare_times()
-    sat()
+    compare_times()
+    #sat()
 
 if __name__ == '__main__':
     main()
