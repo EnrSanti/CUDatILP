@@ -1061,7 +1061,7 @@ def add_background(filename,data,model):
     attrs_to_add=[]
     num_attrs=[]
 
-    print("before adding"+str(model.attrs))
+    print("before "+str(model.attrs))
     print("before numeric"+str(model.numeric))
     for f in feature_directives:
         print("feature f"+str(f))
@@ -1069,13 +1069,11 @@ def add_background(filename,data,model):
         if(f.type == 'numeric'):
             num_attrs.append(f.pred)
 
-    print(model.attrs)
-    print(model.numeric)
-    print(num_attrs)
-    print(attrs_to_add)
+    
     model.attrs[-1:-1] = attrs_to_add
     model.numeric[-1:-1] = num_attrs
-
+    print("after attrs: "+str(model.attrs))
+    print("after numeric: "+str(model.numeric))
 
     model.bg_rules=(rex.rules,rex.facts,pred_stratum)
 
@@ -1131,8 +1129,20 @@ def add_background(filename,data,model):
           
         #print("list to add"+str(list_to_add))
         data[row_idx][-1:-1]=list_to_add
+    import os
+    import csv
 
-    #print(data)
+# ── save enriched dataset to _bg.csv ─────────────────────────────────────
+    bg_path = os.path.splitext(filename)[0] + "_bg.csv"
+
+    header = list(model.attrs)
+
+    with open(bg_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(data)
+
+    print(f"Enriched dataset saved → {bg_path}")
 
 
 
