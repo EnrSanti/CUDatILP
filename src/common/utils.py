@@ -40,6 +40,33 @@ def load_data(file, attrs, label, numerics, amount=-1):
     return ret, attrs
 
 
+def rawbg(path):
+    clean_lines = []
+    with open(path, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            stripped_left = raw_line.lstrip()
+            if stripped_left.startswith("%"):
+                continue
+            comment_pos = raw_line.find("%")
+            if comment_pos != -1:
+                newline = ""
+                if raw_line.endswith("\n"):
+                    newline = "\n"
+                    body = raw_line[:-1]
+                else:
+                    body = raw_line
+
+                body = body[:comment_pos]
+                body = body.rstrip()
+                clean_lines.append(body + newline)
+            else:
+                clean_lines.append(raw_line)
+
+    clean_content = "".join(clean_lines)
+
+    return clean_content
+
+
 def split_data(data, ratio=0.8, shuffle=True):
     if shuffle:
         random.shuffle(data)
