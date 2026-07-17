@@ -1,9 +1,11 @@
-from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule
+
+from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule, rawbg
 from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint
 from src.algos.algoCu import CUDatILP
 import pickle
 from numba import cuda
 import numpy as np
+from src.common.llm import OllamaTranslator
 
 class Classifier:
     def __init__(self, attrs=None, numeric=None, label=None):
@@ -18,8 +20,10 @@ class Classifier:
         self.simple = None
         self.translation = None
         self.bg_rules = None
+        self.bg_raw = None
         self.pred_names = None
         self.feature_directives = None
+        self.translator = None # natural language translation module
 
     def load_data(self, file, amount=-1):
         if self.label != self.attrs[-1]:
@@ -33,7 +37,10 @@ class Classifier:
         self.rules = foldrm(data, ratio=ratio)
     
     def fitGPU(self, data, bg_file=None,col_names=None, ratio=0.5):
-        print("col_names ",col_names)
+        #print("col_names ",col_names)
+        if (bg_file is not None):
+            self.bg_raw = rawbg(bg_file)
+        print("\n\n\n!!!!!!!!!!!", self.bg_raw, "\n\n\n")
         self.rules = CUDatILP(data, bg_file, col_names, self,ratio=ratio)
 
     def predict(self, X):
@@ -82,6 +89,19 @@ class Classifier:
             ret = ret + e + '\n'
         ret = ret + str(justify_data(pos, x, attrs=self.attrs)) + '\n'
         return ret
+    
+    ## --- translator to NL
+    def set_translator(self, translator):
+        self.translator = translator
+
+    def summary(self, description="", simple=True):
+        if self.translator is None:
+            raise RuntimeError("No translator set. Call set_translator() first!")
+        rules = self.asp(simple=simple)
+        background = ""
+        if self.bg_raw is not None:
+            background = self.bg_raw
+        return self.translator.summarize(rules, background, description)
 
 
 def save_model_to_file(model, file):
@@ -95,4 +115,3 @@ def load_model_from_file(file):
     ret = pickle.load(f)
     f.close()
     return ret
-
