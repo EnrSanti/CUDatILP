@@ -1,93 +1,52 @@
-% Combined particulate burden
-pm_total(T) :-
-    pm25(P25),
-    pm10(P10),
-    T = P25 + P10.
+% GOOD air: CO low AND far from industry 
+% so good requires BOTH conditions simultaneously
+% a single feature that is small only when both are satisfied
+good_air_index(G) :-
+    co(C), proximity_to_industrial_areas(D),
+    G = C * (1 / (D + 0.1)).
 
-% Fine-to-coarse ratio: high ratio = more dangerous fine particles
-pm_fine_ratio(R) :-
-    pm25(P25),
-    pm10(P10),
-    R = P25 / (P10 + 0.001).
+% HAZARDOUS: co>2.01 OR no2>26.5 
+% normalised to their respective thresholds
+hazard_driver(H) :-
+    co(C), no2(N),
+    H = C / 2.01 + N / 26.5.
 
-% Combined gas load
-gas_index(G) :-
-    no2(N),
-    so2(S),
-    co(C),
-    G = N + S + C*10.
 
-% NO2-SO2 interaction: both from combustion, synergistic effect
-combustion_index(CI) :-
-    no2(N),
-    so2(S),
-    CI = N * S.
+% near industry AND humid = worst poor conditions
+% product captures co-occurrence
+poor_driver(P) :-
+    proximity_to_industrial_areas(D), humidity(H),
+    P = H / (D + 0.1).
 
-% Proximity-weighted pollution: close industry + high gas = dangerous
-industrial_exposure(E) :-
-    gas_index(G),
-    proximity_to_industrial_areas(D),
-    E = G / (D + 0.1).
+% moderate is the "middle" — not clean enough for good, not bad enough for hazardous
+% encode as distance from the good/hazardous boundaries
+moderate_zone(M) :-
+    co(C), temperature(T),
+    M = C * T / 100.
 
-% PM scaled by industrial proximity
-industrial_pm_risk(R) :-
-    pm_total(T),
-    proximity_to_industrial_areas(D),
-    R = T / (D + 0.1).
+% SO2<=7.2 defines good independently of CO
+% so SO2 is a "clean background" indicator
+% combine with proximity: clean background near industry is suspicious
+so2_proximity(SP) :-
+    so2(S), proximity_to_industrial_areas(D),
+    SP = S * (1 / (D + 0.1)).
 
-% High humidity traps pollutants, low temp reduces dispersion
-dispersion_factor(DF) :-
-    temperature(T),
-    humidity(H),
-    DF = T / (H + 0.1).
+% NO2>26.5 triggers hazardous — NO2 is purely industrial/traffic
+% at short distances it dominates; encode the distance decay
+no2_local(NL) :-
+    no2(N), proximity_to_industrial_areas(D),
+    NL = N / (D * D + 0.1).
 
-% Humidity amplifies PM danger (particles absorb moisture, penetrate deeper)
-humid_pm_index(HPI) :-
-    pm25(P),
-    humidity(H),
-    HPI = P * H / 100.
+% humidity>47.2 triggers poor — humidity traps ALL pollutants
+% so humidity should amplify whichever gas is already elevated
+humidity_trap(HT) :-
+    humidity(H), co(C), no2(N),
+    HT = H * (C + N / 10) / 100.
 
-% People exposed to industrial pollution
-population_industrial_risk(PIR) :-
-    population_density(PD),
-    industrial_exposure(E),
-    PIR = PD * E / 1000.
-
-% People breathing fine particles
-population_pm_risk(PPR) :-
-    population_density(PD),
-    humid_pm_index(HPI),
-    PPR = PD * HPI / 1000.
-
-% Full pollution burden: all gases + particles
-pollution_burden(PB) :-
-    pm_total(PT),
-    gas_index(G),
-    PB = PT + G.
-
-% Health risk score: burden weighted by population and proximity
-health_risk_score(HRS) :-
-    pollution_burden(PB),
-    population_density(PD),
-    proximity_to_industrial_areas(D),
-    HRS = PB * PD / (D + 1).
-
-% Atmospheric risk: dispersion failure under high pollution
-atmospheric_risk(AR) :-
-    pollution_burden(PB),
-    dispersion_factor(DF),
-    AR = PB / (DF + 0.1).
-
-%feature: pm_total/1              MAX DEFAULT 0.
-%feature: pm_fine_ratio/1         MAX DEFAULT 0.
-%feature: gas_index/1             MAX DEFAULT 0.
-%feature: combustion_index/1      MAX DEFAULT 0.
-%feature: industrial_exposure/1   MAX DEFAULT 0.
-%feature: industrial_pm_risk/1    MAX DEFAULT 0.
-%feature: dispersion_factor/1     MAX DEFAULT 0.
-%feature: humid_pm_index/1        MAX DEFAULT 0.
-%feature: population_industrial_risk/1  MAX DEFAULT 0.
-%feature: population_pm_risk/1    MAX DEFAULT 0.
-%feature: pollution_burden/1      MAX DEFAULT 0.
-%feature: health_risk_score/1     MAX DEFAULT 0.
-%feature: atmospheric_risk/1      MAX DEFAULT 0.
+%feature: good_air_index/1   MAX DEFAULT 0.
+%feature: hazard_driver/1    MAX DEFAULT 0.
+%feature: poor_driver/1      MAX DEFAULT 0.
+%feature: moderate_zone/1    MAX DEFAULT 0.
+%feature: so2_proximity/1    MAX DEFAULT 0.
+%feature: no2_local/1        MAX DEFAULT 0.
+%feature: humidity_trap/1    MAX DEFAULT 0.
