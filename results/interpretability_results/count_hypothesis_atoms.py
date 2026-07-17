@@ -4,7 +4,7 @@ import re
 # ==========================
 # Hardcoded input folder
 # ==========================
-INPUT_FOLDER = "./experiments/ai_argicoluture"
+INPUT_FOLDER = "./experiments/loan"
 
 def count_body_atoms(rule):
     rule = rule.strip()
