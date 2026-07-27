@@ -3581,3 +3581,11 @@ def shape_volume():
     print('\n% weight lifting dataset', np.shape(data))
     return model, data
 #---------------------------
+
+def iris():
+    attrs = ['sepal_length','sepal_width','petal_length','petal_width']
+    nums = attrs
+    model = Classifier(attrs=attrs, numeric=nums, label='species')
+    data = model.load_data('results/interpretability_results/experiments/iris/IRIS.csv')
+    print('\n% iris dataset', np.shape(data))
+    return model, data

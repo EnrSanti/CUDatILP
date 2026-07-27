@@ -5,12 +5,12 @@ from datetime import timedelta
 
 
 def main():
-    model, data = satellite()
+    model, data = iris()
 
-    data_train, data_test = split_data(data, ratio=0.8)
+    data_train, data_test = split_data_deterministically(data, ratio=0.75)
 
     start = timer()
-    model.fitGPU(data_train, bg_file="data/bg_sat.lp", col_names=model.attrs, ratio=0.5)
+    model.fitGPU(data_train, bg_file="results/interpretability_results/experiments/iris/iris_bg.lp", col_names=model.attrs, ratio=0.6)
     end = timer()
 
     model.print_asp(simple=True)
@@ -22,11 +22,11 @@ def main():
 
     print('% acc', round(acc, 4), 'macro p r f1', round(p, 4), round(r, 4), round(f1, 4), '# rules', len(model.crs))
 
-    print('% foldrm costs: ', timedelta(seconds=end - start), '\n')
+    print('% cudatilp costs: ', timedelta(seconds=end - start), '\n')
 
-    model.set_translator(OllamaTranslator(model="foldrm-qwen"))
+    model.set_translator(OllamaTranslator(model="cudatilp")) # name of the model created via Modelfile
 
-    problem_description = "This is a satellite classification problem where we want to classify satellites based on their features."
+    problem_description = "This is one of the earliest datasets used in the literature on classification methods and widely used in statistics and machine learning.  The data set contains 3 classes of 50 instances each, where each class refers to a type of iris plant.  One class is linearly separable from the other 2; the latter are not linearly separable from each other."
     print("% Natural language summary of the learned rules... \n")
     print(model.summary(description=problem_description, ), "\n")
 
