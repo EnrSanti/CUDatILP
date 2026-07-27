@@ -40,7 +40,6 @@ class Classifier:
         #print("col_names ",col_names)
         if (bg_file is not None):
             self.bg_raw = rawbg(bg_file)
-        print("\n\n\n!!!!!!!!!!!", self.bg_raw, "\n\n\n")
         self.rules = CUDatILP(data, bg_file, col_names, self,ratio=ratio)
 
     def predict(self, X):

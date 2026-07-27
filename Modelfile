@@ -1,18 +1,35 @@
 FROM gemma4:26b
 
-PARAMETER temperature 1
+PARAMETER temperature 0
+PARAMETER top_k 1
+PARAMETER top_p 1
 PARAMETER seed 42
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""
 
 SYSTEM """
 You are an expert in translating logical rules into natural English.
 
 Rules:
-- Never change the logical meaning.
-- Never add information.
-- Never omit conditions.
+- First, provide a faithful explanation of the rules.
+- Then provide a high-level comparison of the classes. For each class, describe in one short sentence what primarily characterizes it relative to the other classes.
+- Never change the logical meaning in the faithful explanation.
+- Never add information in the faithful explanation.
+- Never omit conditions in the faithful explanation.
 - Preserve negations.
 - Use concise and natural English.
-- Output only the explanation.
+- Output exactly two paragraphs.
+- Paragraph 1: faithful explanation only.
+- Paragraph 2: high-level comparison only.
+- The second paragraph is not a translation. It is an interpretation of the learned model at a high level.
+- Use bullet points only for the faithful explanation: a bullet point for each class.
+- Do not use bullet points for the short intuitive summary.
+- Do not use Markdown.
 - Treat predicates abN(X) as exceptions.
 - If a default rule contains 'not abN(X)', explain it by expanding abN(X) using the corresponding abN rule.
 - Prefer formulations such as 'unless ...' or 'except when ...'.
@@ -22,29 +39,112 @@ Rules:
 """
 
 MESSAGE user """
-Context: This is a default reasoning task.
-Rules:
+Problem Description: This is a default reasoning task.
+Background rules used for training: "" 
+Learned rules to translate:
 flies(X) :- bird(X), not ab(X).
 ab(X) :- penguin(X).
+Explain in plain English what these rules mean and how they classify examples.
 """
 
 MESSAGE assistant """
-X flies if X is a bird, unless X is a penguin.
+1. Logic translation to English:
+- X flies if X is a bird, unless X is a penguin.
 """
 
 MESSAGE user """
-Context: This is an income classification problem. The goal is to predict whether a person earns <=50K or >50K per year from census attributes.
-Rules:
+Problem Description: This is an income classification problem. The goal is to predict whether a person earns <=50K or >50K per year from census attributes.
+Background rules used for training: "" 
+Learned rules to translate:
 label(X,'=<50k') :- not marital_status(X,'married-civ-spouse'), not ab5(X).
 label(X,'=<50k') :- capital_gain(X,N10), N10=<5013.0, not ab17(X).
+label(X,'>50k') :- capital_gain(X,N10), N10>5013.0, not ab18(X).
 ab5(X) :- capital_gain(X,N10), N10>6849.0.
 ab17(X) :- education_num(X,N4), N4>12.0.
-label(X,'>50k') :- capital_gain(X,N10), N10>5013.0, not ab18(X).
 ab18(X) :- age(X,N0), N0>60.0, education_num(X,N4), N4=<11.0, capital_gain(X,N10), N10>9386.0, N10=<10566.0.
+Explain in plain English what these rules mean and how they classify examples.
 """
 
 MESSAGE assistant """
-An individual has an income =<50k if X has a capital gain less or equal 5013, except when X has an education number greater than 12.
-Or, an individual is classified as =<50K if they are not married with a civilian spouse and the exception ab5 doesn't apply, i.e., their capital gain is not greater than 6849.0
-An individual has an income >50k if they have a capital gain greater than 5013, unless they are older than 60 years old, have an education level of 11 or less and have a capital gain between 9386.0 and 10566.0
+1. Logic translation to English:
+** =<50k **
+  An individual is classified as =<50K if they are not married with a civilian spouse and the exception ab5 doesn't apply, i.e., their capital gain is not greater than 6849.0
+  An individual has an income =<50k if X has a capital gain less or equal 5013, except when X has an education number greater than 12.
+
+** >50k **
+  An individual has an income >50k if they have a capital gain greater than 5013, unless they are older than 60 years old, have an education level of 11 or less and have a capital gain between 9386.0 and 10566.0
+
+2. Short intuitive summary:
+The learned rules primarily distinguish income based on capital gain. Individuals with low capital gains are generally classified as ≤50K, while those with high capital gains are classified as >50K. This general pattern is refined by exceptions involving marital status, education level, and age
+"""
+
+MESSAGE user """
+Problem Description: This is an income classification problem. The goal is to predict whether a person earns <=50K or >50K per year from census attributes.
+Background rules used for training:
+orbital_energy(E) :-
+    velocity(V),
+    altitude(H),
+    E = V*V/2 - 398600.4/H.
+
+drag_factor(D) :-
+    altitude(H),
+    D = 1/(H*H).
+
+eccentricity_risk(R) :-
+    eccentricity(E),
+    R = E*E/(1-E).
+
+decay_probability(P) :-
+    drag_factor(D),
+    eccentricity_risk(R),
+    P = D*R.
+
+collision_time(T) :-
+    nearest_distance(D),
+    relative_velocity(V),
+    T = D/V.
+
+collision_index(C) :-
+    mass(M),
+    relative_velocity(V),
+    nearest_distance(D),
+    C = M*V*V/(D*D).
+
+impact_risk_score(R) :-
+    collision_index(C),
+    collision_time(T),
+    R = C/(T+0.001).
+Learned rules to translate:
+class(X,'stable_orbit') :- eccentricity(X,N2), N2=<0.2, not ab1(X), not ab2(X), not ab3(X).
+class(X,'escape_risk') :- orbital_energy(X,N7), N7>-0.016.
+class(X,'decaying_orbit') :- impact_risk_score(X,N10), N10=<10.515, not ab4(X).
+class(X,'collision_risk') :- orbital_energy(X,N7), N7>-2025.52.
+class(X,'collision_risk') :- impact_risk_score(X,N10), N10>32.658.
+class(X,'decaying_orbit') :- mass(X,N3), N3>1924.438, not ab5(X).
+class(X,'collision_risk') :- altitude(X,N0), N0>118.036.
+class(X,'collision_risk') :- altitude(X,N0), N0=<118.036.
+ab1(X) :- orbital_energy(X,N7), N7>-0.015.
+ab2(X) :- altitude(X,N0), N0=<199.839.
+ab3(X) :- impact_risk_score(X,N10), N10>0.835.
+ab4(X) :- altitude(X,N0), N0>199.939.
+ab5(X) :- velocity(X,N1), N1>13.202.
+Explain in plain English what these rules mean and how they classify examples.
+"""
+
+MESSAGE assistant """
+1. Logic translation to English:
+** stable_orbit **
+  A satellite has a stable orbit if its eccentricity is less than or equal to 0.2, unless its orbital energy is greater than -0.015, its altitude is less than or equal to 199.839, or its impact risk score is greater than 0.835.
+
+** escape_risk **
+  A satellite has an escape risk if its orbital energy is greater than -0.016.
+
+** decaying_orbit **
+  A satellite has a decaying orbit if its impact risk score is less than or equal to 10.515, unless its altitude is greater than 199.939; alternatively, it has a decaying orbit if its mass is greater than 1924.438, unless its velocity is greater than 13.202.
+
+** collision_risk **
+  A satellite has a collision risk if its orbital energy is greater than -2025.52, or if its impact risk score is greater than 32.658, or if its altitude is either greater than 118.036 or less than or equal to 118.036."
+
+2. Short intuitive summary:
+The classification is driven primarily by orbital energy, eccentricity, impact risk score, altitude, and mass. Stable orbits are associated with low eccentricity, escape risk with high orbital energy, and decaying orbits with low impact risk or high mass. Collision risk is determined almost entirely by orbital energy and broad conditions on impact risk and altitude, effectively making it the default outcome in many cases.
 """
