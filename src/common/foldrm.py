@@ -5,7 +5,7 @@ from src.algos.algoCu import CUDatILP
 import pickle
 from numba import cuda
 import numpy as np
-from src.common.llm import OllamaTranslator
+#from src.common.llm import OllamaTranslator
 
 class Classifier:
     def __init__(self, attrs=None, numeric=None, label=None):

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import sys
+import os
+import csv
 import re
 import operator
 import itertools
@@ -1077,62 +1079,82 @@ def add_background(filename,data,model):
 
     model.bg_rules=(rex.rules,rex.facts,pred_stratum)
 
+    # ── process rows, expanding ALL directives into multiple rows ──────────────────
+    model.feature_directives = feature_directives
+
+    expanded_data = []
+
     for row_idx in range(len(data)):
-        row_facts=set()
-    
-    
-        #print("pred_names_col ", model.pred_names)
-    
+
+        # 1. build row facts 
+        row_facts = set()
         for i in range(len(model.pred_names)):
-            value_extracted=data[row_idx][i]
-            pred_name=model.pred_names[i]
+            value_extracted = data[row_idx][i]
+            pred_name       = model.pred_names[i].lower()
             row_facts.add((pred_name, value_extracted))
-        
-        facts = rex.facts | row_facts 
-        #add facts
-        #for 
+
+        facts      = rex.facts | row_facts
         answer_set = evaluate_asp(rex.rules, facts, pred_stratum)
 
-        list_to_add=[]
-        #print("QUI: "+str(feature_directives))
-        model.feature_directives = feature_directives
+        # 2. collect values from AS 
+        fixed_values   = []   # (slot_index, value)  for MIN / MAX / arity-0
+        all_candidates = []   # [candidates_list, ...]  one per ALL directive
+        all_slots      = []   # slot index for each ALL directive
+        slot           = 0
+            
         for d in feature_directives:
             if d.arity == 0:
-                #check if feature is in as
-                # if so add 1 to list else 0 
                 present = any(atom[0] == d.pred for atom in answer_set)
-                list_to_add.append(1 if present else 0)
-
+                fixed_values.append((slot, 1 if present else 0))
             else:
-                #check if feature is in as
-                #if so, take min/max according to what specified
-                #else if the type is string/atom put "ATOM NOT FOUND IN AS" or 
-                candidates = []
-                for atom in answer_set:
-                    if atom[0] == d.pred:
-                        candidates.append(atom[1])
+                candidates = [atom[1] for atom in answer_set if atom[0] == d.pred]
 
-
-                if candidates:
+                if candidates:            
                     if d.agg == "MIN":
-                        list_to_add.append(min(candidates))
-                    elif d.agg =="MAX":  # MAX
-                        list_to_add.append(max(candidates))
+                        fixed_values.append((slot, min(candidates)))
+
+                    elif d.agg == "MAX":
+                        fixed_values.append((slot, max(candidates)))
+
                     elif d.agg == "ALL":
-                        pass
-                        #TODO list_to_add.append(candidates)
+                        all_slots.append(slot)
+                        all_candidates.append(candidates)
+
                 else:
-                    # predicate not found in this row's answer set:
-                    # fall back to the user-specified default
-                    list_to_add.append(d.default)
+                    fixed_values.append((slot, d.default))
 
-          
-        #print("list to add"+str(list_to_add))
-        data[row_idx][-1:-1]=list_to_add
-    import os
-    import csv
+            slot += 1
 
-# ── save enriched dataset to _bg.csv ─────────────────────────────────────
+        base_list = [None] * slot
+        for s, v in fixed_values:
+            base_list[s] = v
+
+        original_row = list(data[row_idx])
+
+
+        new_rows = []
+
+        if all_candidates:
+            for combo in itertools.product(*all_candidates):
+                row_extra = list(base_list)
+                for s, v in zip(all_slots, combo):
+                    row_extra[s] = v
+                new_row = list(original_row)
+                new_row[-1:-1] = row_extra
+                new_rows.append(new_row)
+        else:
+            # no ALL directives — single row as before
+            row_extra = base_list
+            new_row   = list(original_row)
+            new_row[-1:-1] = row_extra
+            new_rows  = [new_row]
+        expanded_data.extend(new_rows)
+
+    # 5. replace data in-place 
+    data[:] = expanded_data
+    
+    '''
+    # ── save enriched dataset to _bg.csv (remove)
     bg_path = os.path.splitext(filename)[0] + "_bg.csv"
 
     header = list(model.attrs)
@@ -1143,6 +1165,7 @@ def add_background(filename,data,model):
         writer.writerows(data)
 
     print(f"Enriched dataset saved → {bg_path}")
+    '''
 
 
 
