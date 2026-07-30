@@ -366,7 +366,101 @@ button.save:disabled { border-color: var(--line); color: var(--cream-dim); curso
   min-width: 60px;
 }
 .timer-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-
+/* ===== SUMMARY PANEL ===== */
+.summary-panel {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  display: none;
+  flex-direction: column;
+}
+.summary-panel.visible { display: flex; }
+.summary-head {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.summary-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.summary-title {
+  font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--teal);
+  font-weight: 600;
+}
+.summary-model-input {
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--cream);
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  width: 130px;
+}
+.summary-model-input:focus { outline: none; border-color: var(--teal); }
+.summary-model-input::placeholder { color: var(--cream-dim); }
+button.summarise-btn {
+  background: var(--teal);
+  border: none;
+  color: var(--ink);
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .15s;
+}
+button.summarise-btn:hover:not(:disabled) { opacity: .8; }
+button.summarise-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.summary-desc-row {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.summary-desc-input {
+  width: 100%;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  color: var(--cream);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 3px;
+  resize: vertical;
+  min-height: 48px;
+}
+.summary-desc-input:focus { outline: none; border-color: var(--teal); }
+.summary-desc-input::placeholder { color: var(--cream-dim); }
+.summary-body {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--cream);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  font-family: 'IBM Plex Sans', sans-serif;
+  min-height: 60px;
+}
+.summary-body.err { color: var(--red); font-family: 'Space Mono', monospace; font-size: 12px; }
+.summary-spinner {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border: 2px solid var(--line);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
 /* ===== ERROR PANEL ===== */
 .error-panel {
   border-top: 1px solid var(--line);
@@ -796,6 +890,21 @@ button.modal-confirm:hover { opacity: .85; }
         <div class="error-panel-head">Server / backend error</div>
         <div class="error-body" id="errorBody"></div>
       </div>
+      <div class="summary-panel" id="summaryPanel">
+        <div class="summary-head">
+          <div class="summary-head-left">
+            <span class="summary-title">Natural language summary</span>
+            <input type="text" class="summary-model-input" id="ollamaModel"
+                   placeholder="ollama model…" value="cudatilp">
+          </div>
+          <button class="summarise-btn" id="summariseBtn" disabled>summarise</button>
+        </div>
+        <div class="summary-desc-row">
+          <textarea class="summary-desc-input" id="problemDesc"
+                    placeholder="Optional: describe the problem for the LLM (e.g. 'This dataset contains air quality measurements…')"></textarea>
+        </div>
+        <div class="summary-body" id="summaryBody">Run the learner first, then press <strong>summarise</strong> to get a natural language explanation of the hypothesis.</div>
+      </div>
     </div>
 
   </div>
@@ -1166,6 +1275,7 @@ function renderHypothesis(text){
         <p>The search returned no clauses satisfying the ratio constraints.</p>
       </div>`;
     saveBtn.disabled = true;
+    summariseBtn.disabled = true;
     return;
   }
 
@@ -1187,6 +1297,11 @@ function renderHypothesis(text){
   });
 
   saveBtn.disabled = false;
+  summariseBtn.disabled = false;
+  summaryPanel.classList.add("visible");
+  summaryBody.className = "summary-body";
+  summaryBody.textContent = "Run the learner first, then press summarise to get a natural language explanation of the hypothesis.";
+
 }
 
 /* ===== LEARN ===== */
@@ -1246,6 +1361,50 @@ learnBtn.addEventListener("click", async () => {
     stopTimer();
     statusDot.classList.remove("live");
     validateForm();
+  }
+});
+
+/* ===== SUMMARISE ===== */
+const summariseBtn  = document.getElementById("summariseBtn");
+const summaryPanel  = document.getElementById("summaryPanel");
+const summaryBody   = document.getElementById("summaryBody");
+const ollamaModel   = document.getElementById("ollamaModel");
+const problemDesc   = document.getElementById("problemDesc");
+
+summariseBtn.addEventListener("click", async () => {
+  if (!currentHypothesis) return;
+
+  summariseBtn.disabled = true;
+  summaryPanel.classList.add("visible");
+  summaryBody.className = "summary-body";
+  summaryBody.innerHTML = '<span class="summary-spinner"></span>Asking the LLM…';
+
+  try {
+    const res = await fetch(API_BASE + "/api/summarise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        hypothesis:   currentHypothesis,
+        description:  problemDesc.value.trim(),
+        ollama_model: ollamaModel.value.trim() || "cudatilp",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      summaryBody.className = "summary-body err";
+      summaryBody.textContent = data.error;
+    } else {
+      summaryBody.className = "summary-body";
+      summaryBody.textContent = data.summary;
+    }
+
+  } catch (err) {
+    summaryBody.className = "summary-body err";
+    summaryBody.textContent = "Could not reach the server: " + err.message;
+  } finally {
+    summariseBtn.disabled = false;
   }
 });
 

@@ -94,6 +94,62 @@ def api_ping():
     return jsonify({"ok": True})
 
 
+# ── /api/summarize ─────────────────────────────────────────────────
+
+@app.route("/api/summarise", methods=["POST"])
+def api_summarise():
+    """
+    JSON body
+    ─────────
+    hypothesis    str   required  ASP hypothesis text to summarise
+    description   str   optional  problem description passed to the LLM
+    ollama_model  str   optional  Ollama model name, default "cudatilp"
+    """
+    try:
+        body         = request.get_json(force=True, silent=True) or {}
+        hypothesis   = body.get("hypothesis", "").strip()
+        description  = body.get("description", "")
+        ollama_model = body.get("ollama_model", "cudatilp")
+ 
+        if not hypothesis:
+            return jsonify({"error": "hypothesis is required"}), 400
+ 
+        try:
+            translator = OllamaTranslator(model=ollama_model)
+        except Exception as e:
+            return jsonify({
+                "error": (
+                    f"Could not initialise OllamaTranslator: {e}. "
+                    f"Make sure Ollama is running and the model '{ollama_model}' "
+                    f"has been created via its Modelfile."
+                )
+            }), 500
+ 
+        try:
+            # build a minimal throwaway Classifier so summary() works
+            tmp_model = Classifier(attrs=[], numeric=[], label="")
+            tmp_model.set_translator(translator)
+            summary = tmp_model.summary(
+                hypothesis=hypothesis,
+                description=description,
+            )
+        except Exception as e:
+            return jsonify({
+                "error": (
+                    f"LLM summarisation failed: {e}. "
+                    f"Is Ollama running? Is model '{ollama_model}' loaded?"
+                )
+            }), 500
+ 
+        return jsonify({"summary": summary})
+ 
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print(tb, file=sys.stderr)
+        return jsonify({"error": str(exc), "traceback": tb}), 500
+ 
+ 
+
 # ── /api/learn ────────────────────────────────────────────────────────────────
 
 @app.route("/api/learn", methods=["POST"])
