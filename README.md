@@ -22,8 +22,10 @@ This branch extends the original CUD@ILP implementation with more GPU accelerati
 
 ## Usage
 
-CUD@ILP<sup>2</sup> can be used in the same way as the original FOLD-RM implementation (without background rules).
-Additionally a web-interface can be used.
+CUD@ILP<sup>2</sup> can be used via Python in the same way as the original FOLD-RM implementation (without background rules).
+In addition, a set of background rules can be specified (see main_example.py), moreover an optional LLM can be invoked to sum up and explain in NL the final hypothesis.
+A web-interface can also be used.
+
 
 ### Serial Training
 
@@ -38,9 +40,8 @@ model.fitGPU(...)
 ```
 #### To add background rules, a background file must be specified.
 
-### Interface (CUDA training only)
-
-Run interface_server.py, it will init a local Flask server and open a browser based interface for CUD@ILP<sup>2</sup>.
+### Interface (CUDA only)
+Run run_CUD@ILP2_GUI.py, it will init a local Flask server and open a browser based interface for CUD@ILP<sup>2</sup>.
 <p align="center">
   <img src="./results/interface.png" width="650" alt="CUD@ILP Results">
 </p>

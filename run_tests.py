@@ -267,16 +267,6 @@ def compare_times():
             for i in group_idx:
                 f.write(f"{names[i]},{avg_serial[i]},{avg_parallel[i]},{avg_speedup[i]}\n")
 
-        plot_filename = f"benchmark_{group_name}_{timestamp}.png"
-
-        labels = [names[i] for i in group_idx]
-        serial_vals = [avg_serial[i] for i in group_idx]
-        parallel_vals = [avg_parallel[i] for i in group_idx]
-
-
-        plot_test_results(labels,serial_vals,parallel_vals)
-
-        print(f"{group_name} saved → {plot_filename}")
 
     save_and_plot(long_idx, "long")
     save_and_plot(short_idx, "short")
@@ -289,140 +279,9 @@ def compare_times():
     print(f"All raw results saved to {all_filename}")
 
     
-def plot_test_results(names, serial_times, parallel_times):
-    # 1. Filter out tests that failed
-    plot_data = [
-        (n, s, p) for n, s, p in zip(names, serial_times, parallel_times) 
-        if s is not None and s != -1
-    ]
-    
-    if not plot_data:
-        print("No valid test data to plot.")
-        return
-
-    valid_names = [d[0] for d in plot_data]
-    s_times = [d[1] for d in plot_data]
-    p_times = [d[2] for d in plot_data]
-
-    x = np.arange(len(valid_names))
-    width = 0.35
-
-    fig, ax = plt.subplots(figsize=(14, 7)) # Slightly wider for labels
-    
-    rects1 = ax.bar(x - width/2, s_times, width, label='Serial', color='#5dade2')
-    rects2 = ax.bar(x + width/2, p_times, width, label='Parallel', color='#58d68d')
-
-    # --- Add Speedup Labels ---
-    for i in range(len(valid_names)):
-        s = s_times[i]
-        p = p_times[i]
-        
-        # Calculate speedup (avoid division by zero)
-        speedup = s / p if p > 0 else 0
-        
-        # Determine height for the label (top of the tallest bar in the pair)
-        max_height = max(s, p)
-        
-        # Add text: "x2.5" etc.
-        ax.text(x[i], max_height + (max_height * 0.02), f'x{speedup:.1f}', 
-                ha='center', va='bottom', fontweight='bold', color='#2e4053')
-
-    ax.set_ylabel('Time (seconds)')
-    ax.set_title(f'Test Execution Comparison with Speedup Labels ({datetime.now().strftime("%Y-%m-%d")})')
-    ax.set_xticks(x)
-    ax.set_xticklabels(valid_names, rotation=45, ha="right")
-    ax.legend()
-    ax.grid(axis='y', linestyle='--', alpha=0.5)
-
-    fig.tight_layout()
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"benchmark_{timestamp}.png"
-    
-    plt.savefig(filename)
-    plt.close(fig)
-    print(f"Results saved to: {filename}")
-
-
-def fast_check():
-    test_failed=0
-    bg_files=["data/bg_two_lines.lp"]
-    loaders = [two_lines]#sudoku, two_lines,shape_volume]#adult,breastw,autism, credit,heart,kidney, krkp, mushroom]
-
-    for i in range(len(loaders)):
-        model, data = loaders[i]()   # call function
-        data_train, data_test = split_data_deterministically(data, ratio=0.8)
-        
-        start = timer()
-        model.fit(data_train, ratio=0.4)
-        end = timer()
-        h_cpu=model.get_asp(simple=True)
-
-        Y = [d[-1] for d in data_test]
-        Y_test_hat = model.predict(data_test)
-        accuracy_cpu = get_scores(Y_test_hat, data_test)
-        print('% acc', round(accuracy_cpu, 4), '# rules', len(model.crs))
-        acc, p, r, f1 = scores(Y_test_hat, Y, weighted=True)
-        print('% acc', round(acc, 4), 'macro p r f1', round(p, 4), round(r, 4), round(f1, 4), '# rules', len(model.crs))
-
-        del(model)
-        del(data)
-        del(data_train)
-        del(data_test)
-
-        model, data = loaders[i]()   # call function
-        data_train, data_test = split_data_deterministically(data, ratio=0.8)
-
-        start_gpu = timer()
-        model.fitGPU(data_train,ratio=0.4,bg_file=bg_files[i])
-        end_gpu = timer()
-
-        h_gpu=model.get_asp(simple=True)
-        Y = [d[-1] for d in data_test]
-        Y_test_hat = model.predict(data_test)
-        accuracy_gpu = get_scores(Y_test_hat, data_test)
-        print('% acc', round(accuracy_gpu, 4), '# rules', len(model.crs))
-        acc, p, r, f1 = scores(Y_test_hat, Y, weighted=True)
-        print('% acc', round(acc, 4), 'macro p r f1', round(p, 4), round(r, 4), round(f1, 4), '# rules', len(model.crs))
-
-        print("----------------------------------------------------------------")
-        RED = "\033[91m"
-        GREEN = "\033[92m"
-        RESET = "\033[0m"
-
-        print("----------------------------------------------------------------")
-        RED = "\033[91m"
-        GREEN = "\033[92m"
-        RESET = "\033[0m"
-        YELLOW = "\033[33m"
-        if h_cpu != h_gpu:
-            if(accuracy_cpu == accuracy_gpu):
-                print(f"{YELLOW}OK WORKS (!= hyp = accuracy){RESET}")
-                #print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
-            else:
-                print(f"{RED}test1 failed{RESET}")
-                #print(h_cpu+"\n-----------------------------------\n"+h_gpu)
-                test_failed+=1
-        elif(accuracy_cpu != accuracy_gpu):
-            print(f"{RED}ACCURACY DIFFERENCE(?){RESET}")
-            print(str(accuracy_cpu)+"\n-----------------------------------\n"+str(accuracy_gpu))
-            test_failed+=1
-        else:
-            print(f"{GREEN}test1 passed{RESET}")
-            print(f"Serial: {timedelta(seconds=end - start)} Parallel: {timedelta(seconds=end_gpu - start_gpu)}")
-
-            print(h_cpu+"\n-----------------------------------\n"+h_gpu)
-        
-        
-    
-    if(test_failed==0):
-        print(f"{GREEN}-------------------\nALL passed\n-------------------{RESET}")
-    else:        
-        print(f"{RED}{test_failed}-------------------\nTEST FAILED\n-------------------{RESET}")
 
 def main():
     
-    #fast_check()
     compare_times()
 
 if __name__ == '__main__':

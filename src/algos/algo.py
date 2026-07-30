@@ -3,7 +3,7 @@ from numba import cuda
 import numpy as np
 from timeit import default_timer as timer
 from src.algos.background import evaluate_asp
-
+import itertools
 
 def split_data_by_item(data, item):
     data_pos, data_neg = [], []
@@ -60,78 +60,89 @@ def evaluate(item, x):
 def cover(item, x):
     return evaluate(item, x)
 
-
-
 def classify(items, x, model):
-    #print("x ",x)
-    
-    #bg_rules=(rex.rules,rex.facts,pred_stratum)
-    
-    row_facts=set()
-    
-    if(model.pred_names is not None):
-    
-        #print("pred_names_col ", model.pred_names)
-
+    row_facts = set()
+    if model.pred_names is not None:
         for i in range(len(model.pred_names)):
-            value_extracted=x[i]
-            pred_name=model.pred_names[i]
+            value_extracted = x[i]
+            pred_name = model.pred_names[i].lower()
             row_facts.add((pred_name, value_extracted))
-        
-        rex_facts=model.bg_rules[1]
-        facts = rex_facts | row_facts 
 
+    rex_facts  = model.bg_rules[1]
+    facts      = rex_facts | row_facts
+    answer_set = evaluate_asp(model.bg_rules[0], facts, model.bg_rules[2])
 
+    fixed_values   = []
+    all_candidates = []
+    all_slots      = []
+    slot           = 0
 
-        answer_set = evaluate_asp(model.bg_rules[0], facts, model.bg_rules[2])
+    for d in model.feature_directives:
+        if d.arity == 0:
+            present = any(atom[0] == d.pred for atom in answer_set)
+            fixed_values.append((slot, 1 if present else 0))
+        else:
+            candidates = [atom[1] for atom in answer_set if atom[0] == d.pred]
 
-        #print("answer_set "+str(answer_set))
-        list_to_add=[]
-
-        for d in model.feature_directives:
-            if d.arity == 0:
-                #check if feature is in as
-                # if so add 1 to list else 0 
-                present = any(atom[0] == d.pred for atom in answer_set)
-                list_to_add.append(1 if present else 0)
-
+            if candidates:
+                if d.agg == "MIN":
+                    fixed_values.append((slot, min(candidates)))
+                elif d.agg == "MAX":
+                    fixed_values.append((slot, max(candidates)))
+                elif d.agg == "ALL":
+                    all_slots.append(slot)
+                    all_candidates.append(candidates)
             else:
-                #check if feature is in as
-                #if so, take min/max according to what specified
-                #else if the type is string/atom put "ATOM NOT FOUND IN AS" or 
-                candidates = []
-                for atom in answer_set:
-                    if atom[0] == d.pred:
-                        candidates.append(atom[1])
+                fixed_values.append((slot, d.default))
+
+        slot += 1
+
+    base_list = [None] * slot
+    for s, v in fixed_values:
+        base_list[s] = v
+
+    original_x = list(x)
+    if all_candidates:
+        expanded_rows = []
+        for combo in itertools.product(*all_candidates):
+            row_extra = list(base_list)
+            for s, v in zip(all_slots, combo):
+                row_extra[s] = v
+            new_row = list(original_x)
+            new_row[-1:-1] = row_extra
+            expanded_rows.append(new_row)
+    else:
+        new_row = list(original_x)
+        new_row[-1:-1] = base_list
+        expanded_rows = [new_row]
+
+    predictions = []
+    for row in expanded_rows:
+        pred = None
+        for i in items:
+            if evaluate(i, row):
+                pred = i[0][2]
+                break
+        predictions.append((pred, row))
+
+    #print("predictions: "+str(predictions))
+    return predictions
 
 
-                if candidates:
-                    if d.agg == "MIN":
-                        list_to_add.append(min(candidates))
-                    elif d.agg == "MAX":
-                        list_to_add.append(max(candidates))
-                    elif d.agg == "ALL":
-                        pass
-                        #TODO list_to_add.append(candidates)
-                else:
-                    # predicate not found in this row's answer set:
-                    # fall back to the user-specified default
-                    list_to_add.append(d.default)
+def predict(rules, test_data, model):
+    all_predictions = []
+    expanded_test   = []
 
-        x[-1:-1]=list_to_add
+    for x in test_data:
+        results = classify(rules, x, model)
+        for pred, enriched_row in results:
+            all_predictions.append(pred)
+            expanded_test.append(enriched_row)
 
-        #print("x ADDED : "+str(x))
-    for i in items:
-        if evaluate(i, x):
-            return i[0][2]
-    return None
-
-
-def predict(rules, data, model):
-    ret = []
-    for x in data:
-        ret.append(classify(rules, x,model))
-    return ret
+    # expand test_data in-place so get_scores sees same length
+    test_data[:] = expanded_test
+    #print("all predictions: "+str(test_data))
+    return all_predictions
 
 def gain(tp, fn, tn, fp):
 
