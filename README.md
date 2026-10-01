@@ -39,6 +39,7 @@ model.fitGPU(...)
 ## Testing
 
 The `Run_tests.py` script provides a simple benchmark for comparing the serial and CUDA implementations.
+The datasets in `data/` are stored with Git LFS and are not downloaded by default. To fetch them: `git lfs pull -X ""`
 
 The script:
 
