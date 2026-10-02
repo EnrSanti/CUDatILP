@@ -1,41 +1,42 @@
+import csv
 import random
 from src.algos.algo import evaluate, justify
 
 
 def load_data(file, attrs, label, numerics, amount=-1):
-    f = open(file, 'r')
     attr_idx, num_idx, lab_idx = [], [], -1
-    ret, i, k = [], 0, 0
+    ret, i = [], 0
     head = ''
-    for line in f.readlines():
-        if i == 0:
-            line = line.strip('\n').split(',')
-            attr_idx = [j for j in range(len(line)) if line[j] in attrs]
-            num_idx = [j for j in range(len(line)) if line[j] in numerics]
-            for j in range(len(line)):
-                if line[j] == label:
-                    lab_idx = j
-                    head += line[j]
-        else:
-            line = line.strip('\n').split(',')
-            r = [j for j in range(len(line))]
-            for j in range(len(line)):
-                if j in num_idx:
-                    try:
-                        r[j] = float(line[j])
-                    except:
+    with open(file, 'r', newline='') as f:
+        for line in csv.reader(f):
+            if i == 0:
+                attr_idx = [j for j in range(len(line)) if line[j] in attrs]
+                num_idx = [j for j in range(len(line)) if line[j] in numerics]
+                for j in range(len(line)):
+                    if line[j] == label:
+                        lab_idx = j
+                        head += line[j]
+            elif not line:
+                continue
+            else:
+                r = [j for j in range(len(line))]
+                for j in range(len(line)):
+                    if j in num_idx:
+                        try:
+                            r[j] = float(line[j])
+                        except:
+                            r[j] = line[j]
+                    else:
                         r[j] = line[j]
-                else:
-                    r[j] = line[j]
-            r = [r[j] for j in attr_idx]
-            if lab_idx != -1:
-                y = line[lab_idx]
-                r.append(y)
-            ret.append(r)
-        i += 1
-        amount -= 1
-        if amount == 0:
-            break
+                r = [r[j] for j in attr_idx]
+                if lab_idx != -1:
+                    y = line[lab_idx]
+                    r.append(y)
+                ret.append(r)
+            i += 1
+            amount -= 1
+            if amount == 0:
+                break
     attrs.append(head)
     return ret, attrs
 

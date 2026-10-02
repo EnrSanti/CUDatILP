@@ -219,7 +219,7 @@ def most(data, i=-1):
 
 #main alg
 
-def foldrm(data, ratio=0.5):
+def foldrm(data, ratio=0.5, verbose=True):
     ret = []
     # Accumulators for timings
     overall_most = 0
@@ -278,20 +278,21 @@ def foldrm(data, ratio=0.5):
     # Total time spent
     total_time = overall_most + overall_split + overall_learn + overall_covers1 + overall_setop
 
-    print(f"Timing summary after {total_loops} loops:")
-    print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
-    print(f"split_data:  {overall_split:.4f}s ({100 * overall_split/total_time:.1f}%)")
-    print(f"learn_rule:  {overall_learn:.4f}s ({100 * overall_learn/total_time:.1f}%)")
+    if verbose:
+        print(f"Timing summary after {total_loops} loops:")
+        print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
+        print(f"split_data:  {overall_split:.4f}s ({100 * overall_split/total_time:.1f}%)")
+        print(f"learn_rule:  {overall_learn:.4f}s ({100 * overall_learn/total_time:.1f}%)")
     
-    print(f"----learn_rule summary after {learn_rule_loops} loops:")
-    print(f"----best_item: {overall_best_item:.4f}s ({100 * overall_best_item/total_time:.1f}%)")
-    print(f"----cover:     {overall_covers:.4f}s ({100 * overall_covers/total_time:.1f}%)")
-    print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
-    print(f"----Total:     {total_time:.4f}s")
+        print(f"----learn_rule summary after {learn_rule_loops} loops:")
+        print(f"----best_item: {overall_best_item:.4f}s ({100 * overall_best_item/total_time:.1f}%)")
+        print(f"----cover:     {overall_covers:.4f}s ({100 * overall_covers/total_time:.1f}%)")
+        print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
+        print(f"----Total:     {total_time:.4f}s")
 
-    print(f"cover check: {overall_covers1:.4f}s ({100 * overall_covers1/total_time:.1f}%)")
-    print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
-    print(f"Total:       {total_time:.4f}s")
+        print(f"cover check: {overall_covers1:.4f}s ({100 * overall_covers1/total_time:.1f}%)")
+        print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
+        print(f"Total:       {total_time:.4f}s")
 
     #print("all rules")
     #print(ret)

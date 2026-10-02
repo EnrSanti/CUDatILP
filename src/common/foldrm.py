@@ -1,6 +1,5 @@
 from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule
 from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint
-from src.algos.algoCu import CUDatILP
 import pickle
 from numba import cuda
 import numpy as np
@@ -25,11 +24,13 @@ class Classifier:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
         return data
 
-    def fit(self, data, ratio=0.5):
-        self.rules = foldrm(data, ratio=ratio)
+    def fit(self, data, ratio=0.5, verbose=True):
+        self.rules = foldrm(data, ratio=ratio, verbose=verbose)
     
-    def fitGPU(self, data, ratio=0.5):
-        self.rules = CUDatILP(data, ratio=ratio)
+    def fitGPU(self, data, ratio=0.5, verbose=True):
+        # imported lazily so CPU-only use doesn't require cupy
+        from src.algos.algoCu import CUDatILP
+        self.rules = CUDatILP(data, ratio=ratio, verbose=verbose)
 
     def predict(self, X):
         return predict(self.rules, X)
