@@ -13,7 +13,7 @@ from src.algos.background import *
 #######################################                ##########################################
 #######################################  MAIN METHODS  ##########################################
 
-def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
+def CUDatILP(data, bg_file, col_names, model, ratio=0.5, verbose=True):
     ret = []
     # Accumulators for timings
     overall_most = 0
@@ -27,25 +27,25 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
     total_time = 0 
     learn_rule_loops = 0
     #print("bg FILE", bg_file)
-    
+
     print("attrs "+str(model.attrs))
     print("numeric "+str(model.numeric))
     if(bg_file is not None):
-        
+
         formatted = []
         for col in col_names:
             formatted.append(col.replace(" ", "_"))
-        
+
         model.pred_names=formatted
         add_background(bg_file,data,model)
-        
-        
+
+
         #print("data_incremented"+str(data_incremented))
 
     print("attrs "+str(model.attrs))
     print("numeric "+str(model.numeric))
     begin_preprocess = timer()
-    embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data)
+    embedded_data,categorical_cols,fst_unused_num, rev_map,max_range_cols=embed_data_global(data, verbose)
     
     #print(mapping) col & str -> int (0,1.. n)
     #i just need to keep track of the size of mapping (n) and a list of strings
@@ -94,7 +94,7 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
     vals_dev = cuda.device_array(max(max_range_cols)*num_blocks, dtype=np.int32)
     cats_dev = cuda.device_array(max(max_range_cols)*num_blocks, dtype=np.int32)
     index_sizes_dev = cuda.device_array(2, dtype=np.int32) #e+ e-
-    
+
     num_blocks_cover=int((len(data)+ 128 - 1) / 128)
     index_sizes_dev_pos_dev = cuda.device_array(num_blocks_cover, dtype=np.int32)
     index_to_compact_pos_dev = cuda.device_array(len(data), dtype=np.int32)
@@ -137,19 +137,19 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
         
         start_setop = timer()
         if(len(index_e_plus)+len(index_e_minus)>5000): #true for now, just to check
-            
+
             e_tp_index_dev  = cuda.to_device(np.array(index_e_plus, dtype=np.int32))
             e_tn_index_dev = cuda.to_device(np.array(index_e_minus, dtype=np.int32))
-            
+
             #e_tp_index = [i for i in index_e_plus if not cover_(rule, embedded_data_original, i,categorical_cols,0)]
             #e_tn_index =  [i for i in index_e_minus if not cover_(rule, embedded_data_original, i,categorical_cols,1)]
-            
+
             #print("rule -> ", rule)
             flatRule = FlatState.from_root(rule)
-            #print("rule: ",rule)                            
+            #print("rule: ",rule)
             #print("flatRule: ",flatRule)
             n_valid_tp,n_valid_tn=cover_on_gpu_full_rule(flatRule, embedded_data_original_dev, categorical_cols_dev,e_tp_index_dev,e_tn_index_dev,len(index_e_plus),len(index_e_minus), index_sizes_dev, index_sizes_dev_pos_dev,index_to_compact_pos_dev,index_sizes_dev_neg_dev,index_to_compact_neg_dev)
-            
+
             #print("valid tp:",n_valid_tp)
 
             # 2. Taglia l'array direttamente sulla GPU (lo slicing in Numba non copia dati)
@@ -184,9 +184,9 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
         #print("----------\n")
         #print("remaining original data indexes "+str(original_data_indexes))
         #print("remaining embedded_data "+str(embedded_data))
-        
-        
-         
+
+
+
         end_setop = timer()
 
         overall_setop += end_setop - start_setop
@@ -207,29 +207,29 @@ def CUDatILP(data, bg_file, col_names, model, ratio=0.5):
     #print("all rules")
     #print(ret)
     total_time = overall_most + overall_split + overall_learn + overall_setop
+    if verbose:
+        print(f"Timing summary after {total_loops} loops:")
+        print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
+        print(f"split_data:  {overall_split:.4f}s ({100 * overall_split/total_time:.1f}%)")
+        print(f"learn_rule:  {overall_learn:.4f}s ({100 * overall_learn/total_time:.1f}%)")
 
-    print(f"Timing summary after {total_loops} loops:")
-    print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
-    print(f"split_data:  {overall_split:.4f}s ({100 * overall_split/total_time:.1f}%)")
-    print(f"learn_rule:  {overall_learn:.4f}s ({100 * overall_learn/total_time:.1f}%)")
-    
-    print(f"----learn_rule summary after {learn_rule_loops} loops:")
-    print(f"----best_item: {overall_best_item:.4f}s ({100 * overall_best_item/total_time:.1f}%)")
-    print(f"----cover:     {overall_covers:.4f}s ({100 * overall_covers/total_time:.1f}%)")
-    print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
+        print(f"----learn_rule summary after {learn_rule_loops} loops:")
+        print(f"----best_item: {overall_best_item:.4f}s ({100 * overall_best_item/total_time:.1f}%)")
+        print(f"----cover:     {overall_covers:.4f}s ({100 * overall_covers/total_time:.1f}%)")
+        print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
 
-    print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
-    print(f"Total:       {total_time:.4f}s")
+        print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
+        print(f"Total:       {total_time:.4f}s")
 
-    print(f"Time preprocessing: {overall_preprocess:.4f}s")
-    
-    print(f"Time postprocessing: {post_time:.4f}s")
+        print(f"Time preprocessing: {overall_preprocess:.4f}s")
+
+        print(f"Time postprocessing: {post_time:.4f}s")
     return ret
 
 
 def cover_(rule, embedded_data_original, i,categorical_cols,flag=0):
     example_x=embedded_data_original[i]
-    
+
     return evaluate_(rule, example_x, categorical_cols,flag,0)
 
 def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev):
@@ -243,9 +243,9 @@ def cover_on_gpu(items_dev, embedded_data_original_dev, categorical_cols_dev,ind
     return size_plus,size_minus
 
 def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,index_e_minus_dev,size_plus,size_minus,index_sizes_dev,index_sizes_dev_pos,index_to_compact_pos,index_sizes_dev_neg,index_to_compact_neg):
-    
+
     #si si può compattare tutto in 2 kernel e non 4 launci
-    
+
     nodes = np.asarray(rule.nodes, dtype=np.int32)
     literals = np.asarray(rule.literals, dtype=np.float32)
     edges = np.asarray(rule.edges, dtype=np.int32).reshape(-1, 2)
@@ -253,14 +253,14 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
     nodes_dev = cuda.to_device(nodes)
     literals_dev = cuda.to_device(literals)
     edges_dev = cuda.to_device(edges)
-    
+
     #print_dev[1,1](index_e_plus_dev,size_plus)
     positive_blocks=int((size_plus + 128 - 1) / 128)
     negative_blocks=int((size_minus + 128 - 1) / 128)
- 
-    
+
+
     if(len(rule.nodes)<128):
-        if(positive_blocks>0):  
+        if(positive_blocks>0):
             update_tn_tp_128nodes[positive_blocks,32](index_sizes_dev_pos,index_to_compact_pos,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_plus_dev,size_plus)
         if(negative_blocks>0):
             update_tn_tp_128nodes[negative_blocks,32](index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
@@ -278,13 +278,13 @@ def cover_on_gpu_full_rule(rule, embedded_data_original_dev, categorical_cols_de
         if(negative_blocks>0):
             update_tn_tp[negative_blocks,32](stack_tn,len(rule.nodes),index_sizes_dev_neg,index_to_compact_neg,nodes_dev, literals_dev, edges_dev, embedded_data_original_dev, categorical_cols_dev,index_e_minus_dev,size_minus)
 
-        
+
 
     if(positive_blocks>0):
         comapct_indexes[1,32](index_sizes_dev_pos,index_to_compact_pos,index_e_plus_dev,positive_blocks,index_sizes_dev,0)
     if(negative_blocks>0):
         comapct_indexes[1,32](index_sizes_dev_neg,index_to_compact_neg,index_e_minus_dev,negative_blocks,index_sizes_dev,1)
-    
+
     host_counts = index_sizes_dev.copy_to_host()
     size_plus = int(host_counts[0])
     size_minus = int(host_counts[1])
@@ -307,7 +307,7 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
     if len(item) == 3:
         i, r, v = item
         val = dataset_example[i]
-        
+
         if i in categorical_cols:
             if r == 2:
                 return val == v
@@ -340,7 +340,7 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
                     cond = val == v
                 elif r == 3:
                     cond = val != v
-                    
+
                 else:
                     cond = False
 
@@ -349,23 +349,23 @@ def evaluate_(item, dataset_example, categorical_cols,flag=0,that=0):
                     cond = val <= v
                 elif r == 1:
                     cond = val > v
-                    
+
                 else:
                     cond = False
 
-            
+
             if not cond:
-                
+
                 return 0
 
-                
+
 
     # Negative literals (any must NOT hold)
     if len(item[2]) > 0:
         for sub in item[2]:
-            if evaluate_(sub, dataset_example, categorical_cols,flag,that): 
+            if evaluate_(sub, dataset_example, categorical_cols,flag,that):
                 return False
-          
+
     return 1
 
 
@@ -418,7 +418,7 @@ def learn_rule_(embedded_data_original,  index_e_plus,       index_e_minus,     
                 index_e_minus = index_e_minus_dev[:n_valid_minus].copy_to_host().tolist()
             else:
                 index_e_minus=[]
-        
+
         else:
             index_e_plus = [i for i in index_e_plus if cover_(rule, embedded_data_original, i,categorical_cols)]
             index_e_minus = [i for i in index_e_minus  if cover_(rule, embedded_data_original, i,categorical_cols)]

@@ -1,11 +1,9 @@
-
-from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule, rawbg
+from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule
 from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint
 from src.algos.algoCu import CUDatILP
 import pickle
 from numba import cuda
 import numpy as np
-#from src.common.llm import OllamaTranslator
 
 class Classifier:
     def __init__(self, attrs=None, numeric=None, label=None):
@@ -30,17 +28,17 @@ class Classifier:
             data, self.attrs = load_data(file, self.attrs, self.label, self.numeric, amount)
         else:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
-        
+
         return data
-    
-    def fit(self, data, ratio=0.5):
-        self.rules = foldrm(data, ratio=ratio)
-    
-    def fitGPU(self, data, bg_file=None,col_names=None, ratio=0.5):
+
+    def fit(self, data, ratio=0.5, verbose=True):
+        self.rules = foldrm(data, ratio=ratio, verbose=verbose)
+
+    def fitGPU(self, data, bg_file=None,col_names=None, ratio=0.5, verbose=True):
         #print("col_names ",col_names)
         if (bg_file is not None):
             self.bg_raw = rawbg(bg_file)
-        self.rules = CUDatILP(data, bg_file, col_names, self,ratio=ratio)
+        self.rules = CUDatILP(data, bg_file, col_names, self,ratio=ratio, verbose=verbose)
 
     def predict(self, X):
         return predict(self.rules, X,self)
@@ -88,7 +86,7 @@ class Classifier:
             ret = ret + e + '\n'
         ret = ret + str(justify_data(pos, x, attrs=self.attrs)) + '\n'
         return ret
-    
+
     ## --- translator to NL
     def set_translator(self, translator):
         self.translator = translator
