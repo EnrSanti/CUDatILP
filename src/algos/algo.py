@@ -2,7 +2,6 @@ import math
 from numba import cuda
 import numpy as np
 from timeit import default_timer as timer
-from src.algos.background import evaluate_asp
 import itertools
 
 
@@ -77,6 +76,7 @@ def classify(items, x, model):
         return [(pred, x)]
 
     # ── background: enrich row then classify ──────────────────────────────────
+    from src.algos.background import evaluate_asp
     row_facts = set()
     if model.pred_names is not None:
         for i in range(len(model.pred_names)):
