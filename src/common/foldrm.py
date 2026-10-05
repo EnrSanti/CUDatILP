@@ -1,6 +1,5 @@
 from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule
 from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint
-from src.algos.algoCu import CUDatILP
 import pickle
 from numba import cuda
 import numpy as np
@@ -35,6 +34,7 @@ class Classifier:
         self.rules = foldrm(data, ratio=ratio, verbose=verbose)
 
     def fitGPU(self, data, bg_file=None,col_names=None, ratio=0.5, verbose=True):
+        from src.algos.algoCu import CUDatILP
         #print("col_names ",col_names)
         if (bg_file is not None):
             self.bg_raw = rawbg(bg_file)
