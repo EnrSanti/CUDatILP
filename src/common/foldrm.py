@@ -1,5 +1,5 @@
 from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule
-from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint
+from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint, gain, f1
 import pickle
 from numba import cuda
 import numpy as np
@@ -25,7 +25,10 @@ class Classifier:
         return data
 
     def fit(self, data, ratio=0.5):
-        self.rules = foldrm(data, ratio=ratio)
+        self.rules = foldrm(data, ratio=ratio,heuristic=gain)
+
+    def fit_no_IG_F1(self, data, ratio=0.5):
+        self.rules = foldrm(data, ratio=ratio,heuristic=f1)
     
     def fitGPU(self, data, ratio=0.5):
         # imported lazily so CPU-only use doesn't require cupy

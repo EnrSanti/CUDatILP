@@ -76,6 +76,13 @@ def predict(rules, data):
     return ret
 
 
+
+def f1(tp, fn, tn, fp):
+    if tp == 0:
+        return float("-inf")
+
+    return 2.0 * tp / (2.0 * tp + fp + fn)
+
 def gain(tp, fn, tn, fp):
 
     tp = float(tp)
@@ -119,7 +126,7 @@ def gain(tp, fn, tn, fp):
     return math.floor(ret / 1e-8) * 1e-8
 
 
-def best_ig(data_pos, data_neg, i, used_items=[]):
+def best_heuristic(data_pos, data_neg, i, used_items=[],heursitc=gain):
     xp, xn, cp, cn = 0, 0, 0, 0
     pos, neg = dict(), dict()
     xs, cs = set(), set()
@@ -165,25 +172,25 @@ def best_ig(data_pos, data_neg, i, used_items=[]):
     for x in xs:
         if (i, '<=', x) in used_items or (i, '>', x) in used_items:
             continue
-        ig = gain(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
+        ig = heursitc(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
         if best < ig:
             best, v, r = ig, x, '<='
-        ig = gain(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
+        ig = heursitc(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
         if best < ig:
             best, v, r = ig, x, '>'
     for c in cs:
         if (i, '==', c) in used_items or (i, '!=', c) in used_items:
             continue
-        ig = gain(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
+        ig = heursitc(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
         if best < ig:
             best, v, r = ig, c, '=='
-        ig = gain(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
+        ig = heursitc(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
         if best < ig:
             best, v, r = ig, c, '!='
     return best, r, v
 
 
-def best_item(X_pos, X_neg, used_items=[]):
+def best_item(X_pos, X_neg, used_items=[],heuristic=gain):
 
     ret = -1, '', ''
     if len(X_pos) == 0 and len(X_neg) == 0:
@@ -197,7 +204,7 @@ def best_item(X_pos, X_neg, used_items=[]):
 
     for i in range(n - 1):
         
-        ig, r, v = best_ig(X_pos, X_neg, i, used_items)
+        ig, r, v = best_heuristic(X_pos, X_neg, i, used_items,heuristic)
         if best < ig:
             best = ig
             ret = i, r, v
@@ -219,7 +226,7 @@ def most(data, i=-1):
 
 #main alg
 
-def foldrm(data, ratio=0.5):
+def foldrm(data, ratio=0.5, heuristic=gain):
     ret = []
     # Accumulators for timings
 
@@ -231,7 +238,7 @@ def foldrm(data, ratio=0.5):
         
         e_plus, e_minus = split_data_by_item(data, l)
 
-        rule = learn_rule(e_plus, e_minus, [], ratio)
+        rule = learn_rule(e_plus, e_minus, [], ratio,heuristic)
 
         
         e_tp = [e_plus[i] for i in range(len(e_plus)) if not cover(rule, e_plus[i])]
@@ -252,13 +259,13 @@ def foldrm(data, ratio=0.5):
 
 
 
-def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5):
+def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
     items = []
 
     while True:
 
         
-        t = best_item(data_pos, data_neg, used_items + items)
+        t = best_item(data_pos, data_neg, used_items + items,heuristic)
 
 
         items.append(t)
