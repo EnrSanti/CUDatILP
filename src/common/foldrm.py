@@ -24,13 +24,13 @@ class Classifier:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
         return data
 
-    def fit(self, data, ratio=0.5, verbose=True):
-        self.rules = foldrm(data, ratio=ratio, verbose=verbose)
+    def fit(self, data, ratio=0.5):
+        self.rules = foldrm(data, ratio=ratio)
     
-    def fitGPU(self, data, ratio=0.5, verbose=True):
+    def fitGPU(self, data, ratio=0.5):
         # imported lazily so CPU-only use doesn't require cupy
         from src.algos.algoCu import CUDatILP
-        self.rules = CUDatILP(data, ratio=ratio, verbose=verbose)
+        self.rules = CUDatILP(data, ratio=ratio)
 
     def predict(self, X):
         return predict(self.rules, X)

@@ -6,8 +6,7 @@ from timeit import default_timer as timer
 
 #From the dataset (matrix) return a matrix of the same size with only integer values and a dictionary provinding a mapping (and reverse mapping) between the two matrices
 
-def embed_data_global(data, verbose=True):
-    timer_t = timer()
+def embed_data_global(data):
 
     categorical_cols = []
     
@@ -21,16 +20,8 @@ def embed_data_global(data, verbose=True):
     # Collect all unique values across all categorical columns
     data_np = np.array(data)
      
-    
-    # Encode the data
-    timer2 = timer()
-    if verbose:
-        print(f"Time for global embedding 1: {timer2 - timer_t:.4f}s")
     encoded_data,placeholder_numeric, rev_map,range_per_col = encode_data_global_with_placeholder(data_np, categorical_cols)
     rev_map[-1]=rev_map[len(data[0])-1]
-    timer3 = timer()
-    if verbose:
-        print(f"Time for global embedding 2: {timer3 - timer2:.4f}s")
     return encoded_data, categorical_cols, placeholder_numeric, rev_map,range_per_col
 
 def encode_data_global_with_placeholder(data_np, categorical_cols):

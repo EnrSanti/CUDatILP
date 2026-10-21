@@ -219,120 +219,54 @@ def most(data, i=-1):
 
 #main alg
 
-def foldrm(data, ratio=0.5, verbose=True):
+def foldrm(data, ratio=0.5):
     ret = []
     # Accumulators for timings
-    overall_most = 0
-    overall_split = 0
-    overall_learn = 0
-    overall_covers1 = 0
-    overall_setop = 0
-    total_loops = 0
-    overall_best_item=0
-    overall_covers=0 
-    overall_fold = 0 
-    total_time = 0 
-    learn_rule_loops = 0
-    while len(data) > 0:
-        total_loops += 1
 
-        start_most = timer()
+
+    while len(data) > 0:
+
         l = most(data)
         #print(l)
-        end_most = timer()
-        overall_most += end_most - start_most
         
-        start_split = timer()
         e_plus, e_minus = split_data_by_item(data, l)
-        end_split = timer()
-        overall_split += end_split - start_split
 
-        start_learn = timer()
-        rule,best_item, coversTime,foldTime,timeTotal,loops = learn_rule(e_plus, e_minus, [], ratio)
-        overall_best_item+=best_item
-        overall_covers+=coversTime
-        overall_fold+=foldTime
-        total_time+=timeTotal
-        learn_rule_loops+=loops
-        end_learn = timer()
-        overall_learn += end_learn - start_learn
+        rule = learn_rule(e_plus, e_minus, [], ratio)
+
         
-        start_covers1 = timer()
         e_tp = [e_plus[i] for i in range(len(e_plus)) if not cover(rule, e_plus[i])]
-        end_covers1 = timer()
-        overall_covers1 += end_covers1 - start_covers1
-
+       
         if len(e_tp) == len(e_plus):
             break
 
-        start_setop = timer()
         data = e_tp + [e_minus[i] for i in range(len(e_minus)) if not cover(rule, e_minus[i])]
-        end_setop = timer()
-
-        overall_setop += end_setop - start_setop
+  
         
         # Append rule with selected literal
         rule = l, rule[1], rule[2], rule[3]
         ret.append(rule)
     
-    # Total time spent
-    total_time = overall_most + overall_split + overall_learn + overall_covers1 + overall_setop
-
-    if verbose:
-        print(f"Timing summary after {total_loops} loops:")
-        print(f"most:        {overall_most:.4f}s ({100 * overall_most/total_time:.1f}%)")
-        print(f"split_data:  {overall_split:.4f}s ({100 * overall_split/total_time:.1f}%)")
-        print(f"learn_rule:  {overall_learn:.4f}s ({100 * overall_learn/total_time:.1f}%)")
     
-        print(f"----learn_rule summary after {learn_rule_loops} loops:")
-        print(f"----best_item: {overall_best_item:.4f}s ({100 * overall_best_item/total_time:.1f}%)")
-        print(f"----cover:     {overall_covers:.4f}s ({100 * overall_covers/total_time:.1f}%)")
-        print(f"----fold:      {overall_fold:.4f}s ({100 * overall_fold/total_time:.1f}%)")
-        print(f"----Total:     {total_time:.4f}s")
 
-        print(f"cover check: {overall_covers1:.4f}s ({100 * overall_covers1/total_time:.1f}%)")
-        print(f"set op:      {overall_setop:.4f}s ({100 * overall_setop/total_time:.1f}%)")
-        print(f"Total:       {total_time:.4f}s")
-
-    #print("all rules")
-    #print(ret)
     return ret
 
 
 
 def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5):
     items = []
-    learn_rule_loops = 0
-
-    # Timing accumulators
-    overall_best_item = 0
-    overall_covers = 0
-    overall_fold = 0
 
     while True:
-        learn_rule_loops += 1
 
-        # ===== best_item timing =====
-        start_best_item = timer()
-        #print("*****************************\n")
-        #print("POS: "+str(data_pos))
-        #print("----------------\n")
-        #print("\n NEG: "+str(data_neg))
-        #print("*****************************\n")
         
         t = best_item(data_pos, data_neg, used_items + items)
-        end_best_item = timer()
-        overall_best_item += end_best_item - start_best_item 
+
 
         items.append(t)
         rule = -1, items, [], 0
 
         # ===== cover timing =====
-        start_cover_pos_neg = timer()
         data_pos = [data_pos[i] for i in range(len(data_pos)) if cover(rule, data_pos[i])]
         data_neg = [data_neg[i] for i in range(len(data_neg)) if cover(rule, data_neg[i])]
-        end_cover_pos_neg = timer()
-        overall_covers += end_cover_pos_neg - start_cover_pos_neg
 
         # Check termination conditions
         if t[0] == -1 or len(data_neg) <= len(data_pos) * ratio:
@@ -341,32 +275,24 @@ def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5):
 
             if len(data_neg) > 0 and t[0] != -1:
                 # ===== fold timing =====
-                start_fold = timer()
+     
                 ab = fold(data_neg, data_pos, used_items + items, ratio)
-                end_fold = timer()
-                overall_fold += end_fold - start_fold
-
+        
                 if len(ab) > 0:
                     rule = rule[0], rule[1], ab, 0
             break
 
     # Total time for profiling
-    total_time = overall_best_item + overall_covers + overall_fold
-
-    #print("returned rule: " +str(rule))
-    return rule, overall_best_item, overall_covers,overall_fold,total_time,learn_rule_loops
+    return rule
 
 def fold(data_pos, data_neg, used_items=[], ratio=0.5):
     ret = []
     while len(data_pos) > 0:
-        #print("fold SERIAL")
-        rule,_,_,_,_,_ = learn_rule(data_pos, data_neg, used_items, ratio)
+        rule = learn_rule(data_pos, data_neg, used_items, ratio)
         data_fn = [data_pos[i] for i in range(len(data_pos)) if not cover(rule, data_pos[i])]
         if len(data_pos) == len(data_fn):
             break
         data_pos = data_fn
-        #print("QUIIIIII")
-        #print(rule)
         ret.append(rule)
     return ret
 
