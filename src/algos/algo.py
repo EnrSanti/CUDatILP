@@ -126,7 +126,7 @@ def gain(tp, fn, tn, fp):
     return math.floor(ret / 1e-8) * 1e-8
 
 
-def best_heuristic(data_pos, data_neg, i, used_items=[],heursitc=gain):
+def best_heuristic(data_pos, data_neg, i, used_items=[], heuristic=gain):
     xp, xn, cp, cn = 0, 0, 0, 0
     pos, neg = dict(), dict()
     xs, cs = set(), set()
@@ -172,19 +172,19 @@ def best_heuristic(data_pos, data_neg, i, used_items=[],heursitc=gain):
     for x in xs:
         if (i, '<=', x) in used_items or (i, '>', x) in used_items:
             continue
-        ig = heursitc(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
+        ig = heuristic(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
         if best < ig:
             best, v, r = ig, x, '<='
-        ig = heursitc(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
+        ig = heuristic(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
         if best < ig:
             best, v, r = ig, x, '>'
     for c in cs:
         if (i, '==', c) in used_items or (i, '!=', c) in used_items:
             continue
-        ig = heursitc(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
+        ig = heuristic(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
         if best < ig:
             best, v, r = ig, c, '=='
-        ig = heursitc(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
+        ig = heuristic(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
         if best < ig:
             best, v, r = ig, c, '!='
     return best, r, v
