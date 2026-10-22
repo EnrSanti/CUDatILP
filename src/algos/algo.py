@@ -80,7 +80,8 @@ def predict(rules, data):
 def f1(tp, fn, tn, fp):
     if tp == 0:
         return float("-inf")
-
+    # todo questa heuristica mi ritona regole che prendono solo positivi (non rigettano ninete) mancano gli if dell'altra
+    # mi ha generato prev_cloud(X,'2') :- month(X,N0), N0=<12.0.    :)
     return 2.0 * tp / (2.0 * tp + fp + fn)
 
 def gain(tp, fn, tn, fp):
@@ -91,7 +92,7 @@ def gain(tp, fn, tn, fp):
     fp = float(fp)
 
     if tp + tn < fp + fn:
-        return -1e20
+        return -1e20    #todo best item usa -inf quindi questo è comunque un valore valido, tanto vale usare -inf anche qui
 
     tot_p = tp + fp
     tot_n = tn + fn
@@ -299,7 +300,7 @@ def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
             if len(data_neg) > 0 and t[0] != -1:
                 # ===== fold timing =====
      
-                ab = fold(data_neg, data_pos, used_items + items, ratio)
+                ab = fold(data_neg, data_pos, used_items + items, ratio) # todo, non dovrebbe anche questo usare heuristic? dato che richiama learn_rule
         
                 if len(ab) > 0:
                     rule = rule[0], rule[1], ab, 0
