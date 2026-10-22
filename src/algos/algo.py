@@ -259,6 +259,22 @@ def foldrm(data, ratio=0.5, heuristic=gain):
 
 
 
+def foldr(data, target, ratio=0.5):
+    pos = [d for d in data if d[-1] == target]
+    neg = [d for d in data if d[-1] != target]
+    ret = []
+    while len(pos) > 0:
+        rule = learn_rule(pos, neg, [], ratio)
+        if not rule[1]:
+            break
+        rest = [d for d in pos if not cover(rule, d)]
+        if len(rest) == len(pos):
+            break
+        pos = rest
+        ret.append(((-1, '==', target), rule[1], rule[2], rule[3]))
+    return ret
+
+
 def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
     items = []
 
