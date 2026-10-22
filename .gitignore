@@ -4,4 +4,4 @@
 # Ignore Python cache
 __pycache__/
 *.py[cod]
-old/
+old/.venv/
