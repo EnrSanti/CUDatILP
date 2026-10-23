@@ -4,7 +4,6 @@ import numpy as np
 from timeit import default_timer as timer
 
 
-
 def split_data_by_item(data, item):
     data_pos, data_neg = [], []
     for x in data:
@@ -19,32 +18,32 @@ def split_data_by_item(data, item):
 def evaluate(item, x):
     def __eval(i, r, v):
         if isinstance(v, str):
-            if r == '==':
+            if r == "==":
                 return x[i] == v
-            elif r == '!=':
+            elif r == "!=":
                 return x[i] != v
             else:
                 return False
         elif isinstance(x[i], str):
             return False
-        elif r == '<=':
+        elif r == "<=":
             return x[i] <= v
-        elif r == '>':
+        elif r == ">":
             return x[i] > v
         else:
             return False
 
     def _eval(i):
-        
-        #print(i)
-        ret_val=0
+
+        # print(i)
+        ret_val = 0
         if len(i) == 3:
-            ret_val= __eval(i[0], i[1], i[2])
+            ret_val = __eval(i[0], i[1], i[2])
         elif len(i) == 4:
-            ret_val= evaluate(i, x)
-        #print(ret_val)
+            ret_val = evaluate(i, x)
+        # print(ret_val)
         return ret_val
-    
+
     if len(item) == 0:
         return 0
     if len(item) == 3:
@@ -56,10 +55,8 @@ def evaluate(item, x):
     return 1
 
 
-
 def cover(item, x):
     return evaluate(item, x)
-
 
 
 def classify(items, x):
@@ -76,15 +73,16 @@ def predict(rules, data):
     return ret
 
 
-
 def f1(tp, fn, tn, fp):
+    print("f1")
     if tp == 0:
         return float("-inf")
 
     return 2.0 * tp / (2.0 * tp + fp + fn)
 
-def gain(tp, fn, tn, fp):
 
+def gain(tp, fn, tn, fp):
+    print("gain")
     tp = float(tp)
     fn = float(fn)
     tn = float(tn)
@@ -126,11 +124,11 @@ def gain(tp, fn, tn, fp):
     return math.floor(ret / 1e-8) * 1e-8
 
 
-def best_heuristic(data_pos, data_neg, i, used_items=[],heursitc=gain):
+def best_heuristic(data_pos, data_neg, i, used_items=[], heursitc=gain):
     xp, xn, cp, cn = 0, 0, 0, 0
     pos, neg = dict(), dict()
     xs, cs = set(), set()
-    #print("COL: "+str(i))
+    # print("COL: "+str(i))
     for d in data_pos:
         if d[i] not in pos:
             pos[d[i]], neg[d[i]] = 0, 0
@@ -153,62 +151,61 @@ def best_heuristic(data_pos, data_neg, i, used_items=[],heursitc=gain):
             xn += 1.0
     xs, cs = list(xs), list(cs)
 
-    
     xs.sort()
     cs.sort()
-    #print("(SORTED) uniquecats: \n")
-    #print(cs)
-    #print("(SORTED) unique_vals_present_cpu: \n")
-    #print(xs)
+    # print("(SORTED) uniquecats: \n")
+    # print(cs)
+    # print("(SORTED) unique_vals_present_cpu: \n")
+    # print(xs)
     for j in range(1, len(xs)):
         pos[xs[j]] += pos[xs[j - 1]]
         neg[xs[j]] += neg[xs[j - 1]]
 
-    #print("pos prefix: \n")
-    #print(pos)
-    #print("neg prefix:: \n")
-    #print(neg)
-    best, v, r = -1e20, -1e20, ''
+    # print("pos prefix: \n")
+    # print(pos)
+    # print("neg prefix:: \n")
+    # print(neg)
+    best, v, r = -1e20, -1e20, ""
     for x in xs:
-        if (i, '<=', x) in used_items or (i, '>', x) in used_items:
+        if (i, "<=", x) in used_items or (i, ">", x) in used_items:
             continue
         ig = heursitc(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
         if best < ig:
-            best, v, r = ig, x, '<='
+            best, v, r = ig, x, "<="
         ig = heursitc(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
         if best < ig:
-            best, v, r = ig, x, '>'
+            best, v, r = ig, x, ">"
     for c in cs:
-        if (i, '==', c) in used_items or (i, '!=', c) in used_items:
+        if (i, "==", c) in used_items or (i, "!=", c) in used_items:
             continue
         ig = heursitc(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
         if best < ig:
-            best, v, r = ig, c, '=='
+            best, v, r = ig, c, "=="
         ig = heursitc(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
         if best < ig:
-            best, v, r = ig, c, '!='
+            best, v, r = ig, c, "!="
     return best, r, v
 
 
-def best_item(X_pos, X_neg, used_items=[],heuristic=gain):
+def best_item(X_pos, X_neg, used_items=[], heuristic=gain):
 
-    ret = -1, '', ''
+    ret = -1, "", ""
     if len(X_pos) == 0 and len(X_neg) == 0:
         return ret
-    
-    n = len(X_pos[0]) if len(X_pos) > 0 else len(X_neg[0])
-    best = float('-inf')
 
-    #print("xpos: "+str(X_pos))
-    #print("xneg: "+str(X_neg))
+    n = len(X_pos[0]) if len(X_pos) > 0 else len(X_neg[0])
+    best = float("-inf")
+
+    # print("xpos: "+str(X_pos))
+    # print("xneg: "+str(X_neg))
 
     for i in range(n - 1):
-        
-        ig, r, v = best_heuristic(X_pos, X_neg, i, used_items,heuristic)
+
+        ig, r, v = best_heuristic(X_pos, X_neg, i, used_items, heuristic)
         if best < ig:
             best = ig
             ret = i, r, v
-    #print("best item"+ str(ret))
+    # print("best item"+ str(ret))
     return ret
 
 
@@ -218,45 +215,43 @@ def most(data, i=-1):
         if d[i] not in tab:
             tab[d[i]] = 0
         tab[d[i]] += 1
-    y, n = '', 0
+    y, n = "", 0
     for t in tab:
         if n <= tab[t]:
             y, n = t, tab[t]
-    return i, '==', y
+    return i, "==", y
 
-#main alg
+
+# main alg
+
 
 def foldrm(data, ratio=0.5, heuristic=gain):
     ret = []
     # Accumulators for timings
 
-
     while len(data) > 0:
 
         l = most(data)
-        #print(l)
-        
+        # print(l)
+
         e_plus, e_minus = split_data_by_item(data, l)
 
-        rule = learn_rule(e_plus, e_minus, [], ratio,heuristic)
+        rule = learn_rule(e_plus, e_minus, [], ratio, heuristic)
 
-        
         e_tp = [e_plus[i] for i in range(len(e_plus)) if not cover(rule, e_plus[i])]
-       
+
         if len(e_tp) == len(e_plus):
             break
 
-        data = e_tp + [e_minus[i] for i in range(len(e_minus)) if not cover(rule, e_minus[i])]
-  
-        
+        data = e_tp + [
+            e_minus[i] for i in range(len(e_minus)) if not cover(rule, e_minus[i])
+        ]
+
         # Append rule with selected literal
         rule = l, rule[1], rule[2], rule[3]
         ret.append(rule)
-    
-    
 
     return ret
-
 
 
 def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
@@ -264,16 +259,18 @@ def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
 
     while True:
 
-        
-        t = best_item(data_pos, data_neg, used_items + items,heuristic)
-
+        t = best_item(data_pos, data_neg, used_items + items, heuristic)
 
         items.append(t)
         rule = -1, items, [], 0
 
         # ===== cover timing =====
-        data_pos = [data_pos[i] for i in range(len(data_pos)) if cover(rule, data_pos[i])]
-        data_neg = [data_neg[i] for i in range(len(data_neg)) if cover(rule, data_neg[i])]
+        data_pos = [
+            data_pos[i] for i in range(len(data_pos)) if cover(rule, data_pos[i])
+        ]
+        data_neg = [
+            data_neg[i] for i in range(len(data_neg)) if cover(rule, data_neg[i])
+        ]
 
         # Check termination conditions
         if t[0] == -1 or len(data_neg) <= len(data_pos) * ratio:
@@ -282,9 +279,9 @@ def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
 
             if len(data_neg) > 0 and t[0] != -1:
                 # ===== fold timing =====
-     
-                ab = fold(data_neg, data_pos, used_items + items, ratio)
-        
+
+                ab = fold(data_neg, data_pos, used_items + items, ratio, heuristic)
+
                 if len(ab) > 0:
                     rule = rule[0], rule[1], ab, 0
             break
@@ -292,11 +289,14 @@ def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
     # Total time for profiling
     return rule
 
-def fold(data_pos, data_neg, used_items=[], ratio=0.5):
+
+def fold(data_pos, data_neg, used_items=[], ratio=0.5, heursitic=gain):
     ret = []
     while len(data_pos) > 0:
-        rule = learn_rule(data_pos, data_neg, used_items, ratio)
-        data_fn = [data_pos[i] for i in range(len(data_pos)) if not cover(rule, data_pos[i])]
+        rule = learn_rule(data_pos, data_neg, used_items, ratio, heursitic)
+        data_fn = [
+            data_pos[i] for i in range(len(data_pos)) if not cover(rule, data_pos[i])
+        ]
         if len(data_pos) == len(data_fn):
             break
         data_pos = data_fn

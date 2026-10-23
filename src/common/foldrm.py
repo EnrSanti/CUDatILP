@@ -1,8 +1,29 @@
-from src.common.utils import load_data, split_data, split_data_deterministically, get_scores, justify_data, decode_rules, proof_tree, scores, zip_rule, simplify_rule
-from src.algos.algo import foldrm, predict, classify, flatten_rules, justify, add_constraint, gain, f1
+from src.common.utils import (
+    load_data,
+    split_data,
+    split_data_deterministically,
+    get_scores,
+    justify_data,
+    decode_rules,
+    proof_tree,
+    scores,
+    zip_rule,
+    simplify_rule,
+)
+from src.algos.algo import (
+    foldrm,
+    predict,
+    classify,
+    flatten_rules,
+    justify,
+    add_constraint,
+    gain,
+    f1,
+)
 import pickle
 from numba import cuda
 import numpy as np
+
 
 class Classifier:
     def __init__(self, attrs=None, numeric=None, label=None):
@@ -19,20 +40,24 @@ class Classifier:
 
     def load_data(self, file, amount=-1):
         if self.label != self.attrs[-1]:
-            data, self.attrs = load_data(file, self.attrs, self.label, self.numeric, amount)
+            data, self.attrs = load_data(
+                file, self.attrs, self.label, self.numeric, amount
+            )
         else:
             data, _ = load_data(file, self.attrs[:-1], self.label, self.numeric, amount)
         return data
 
     def fit(self, data, ratio=0.5):
-        self.rules = foldrm(data, ratio=ratio,heuristic=gain)
+        self.rules = foldrm(data, ratio=ratio, heuristic=gain)
 
     def fit_no_IG_F1(self, data, ratio=0.5):
-        self.rules = foldrm(data, ratio=ratio,heuristic=f1)
-    
+        print("training with f1 INSIDE")
+        self.rules = foldrm(data, ratio=ratio, heuristic=f1)
+
     def fitGPU(self, data, ratio=0.5):
         # imported lazily so CPU-only use doesn't require cupy
         from src.algos.algoCu import CUDatILP
+
         self.rules = CUDatILP(data, ratio=ratio)
 
     def predict(self, X):
@@ -58,40 +83,39 @@ class Classifier:
     def print_asp(self, simple=False):
         for r in self.asp(simple):
             print(r)
-    
+
     def get_asp(self, simple=False):
         return "\n".join(self.asp(simple))
-    
+
     def explain(self, x):
-        ret = ''
+        ret = ""
         pos = []
         justify(self.crs, x, pos=pos)
         expl = decode_rules(pos, self.attrs, x=x)
         for e in expl:
-            ret = ret + e + '\n'
-        ret = ret + str(justify_data(pos, x, attrs=self.attrs)) + '\n'
+            ret = ret + e + "\n"
+        ret = ret + str(justify_data(pos, x, attrs=self.attrs)) + "\n"
         return ret
 
     def proof(self, x):
-        ret = ''
+        ret = ""
         pos = []
         justify(self.crs, x, pos=pos)
         expl = proof_tree(pos, self.attrs, x=x)
         for e in expl:
-            ret = ret + e + '\n'
-        ret = ret + str(justify_data(pos, x, attrs=self.attrs)) + '\n'
+            ret = ret + e + "\n"
+        ret = ret + str(justify_data(pos, x, attrs=self.attrs)) + "\n"
         return ret
 
 
 def save_model_to_file(model, file):
-    f = open(file, 'wb')
+    f = open(file, "wb")
     pickle.dump(model, f)
     f.close()
 
 
 def load_model_from_file(file):
-    f = open(file, 'rb')
+    f = open(file, "rb")
     ret = pickle.load(f)
     f.close()
     return ret
-
