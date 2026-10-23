@@ -74,7 +74,6 @@ def predict(rules, data):
 
 
 def f1(tp, fn, tn, fp):
-    print("f1")
     if tp == 0:
         return -1e20
     # todo questa heuristica mi ritona regole che prendono solo positivi (non rigettano ninete) mancano gli if dell'altra
