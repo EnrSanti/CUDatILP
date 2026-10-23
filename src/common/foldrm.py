@@ -51,7 +51,6 @@ class Classifier:
         self.rules = foldrm(data, ratio=ratio, heuristic=gain)
 
     def fit_no_IG_F1(self, data, ratio=0.5):
-        print("training with f1 INSIDE")
         self.rules = foldrm(data, ratio=ratio, heuristic=f1)
 
     def fitGPU(self, data, ratio=0.5):

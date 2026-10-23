@@ -77,7 +77,8 @@ def f1(tp, fn, tn, fp):
     print("f1")
     if tp == 0:
         return float("-inf")
-
+    # todo questa heuristica mi ritona regole che prendono solo positivi (non rigettano ninete) mancano gli if dell'altra
+    # mi ha generato prev_cloud(X,'2') :- month(X,N0), N0=<12.0.    :)
     return 2.0 * tp / (2.0 * tp + fp + fn)
 
 
@@ -89,7 +90,7 @@ def gain(tp, fn, tn, fp):
     fp = float(fp)
 
     if tp + tn < fp + fn:
-        return -1e20
+        return -1e20    #todo best item usa -inf quindi questo è comunque un valore valido, tanto vale usare -inf anche qui
 
     tot_p = tp + fp
     tot_n = tn + fn
@@ -169,7 +170,7 @@ def best_heuristic(data_pos, data_neg, i, used_items=[], heursitc=gain):
     for x in xs:
         if (i, "<=", x) in used_items or (i, ">", x) in used_items:
             continue
-        ig = heursitc(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
+        ig = heuristic(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
         if best < ig:
             best, v, r = ig, x, "<="
         ig = heursitc(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
@@ -178,7 +179,7 @@ def best_heuristic(data_pos, data_neg, i, used_items=[], heursitc=gain):
     for c in cs:
         if (i, "==", c) in used_items or (i, "!=", c) in used_items:
             continue
-        ig = heursitc(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
+        ig = heuristic(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
         if best < ig:
             best, v, r = ig, c, "=="
         ig = heursitc(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
