@@ -10,16 +10,7 @@ from src.common.utils import (
     zip_rule,
     simplify_rule,
 )
-from src.algos.algo import (
-    foldrm,
-    predict,
-    classify,
-    flatten_rules,
-    justify,
-    add_constraint,
-    gain,
-    f1,
-)
+from src.algos.algo import foldrm, foldr, predict, classify, flatten_rules, justify, add_constraint, gain, f1
 import pickle
 from numba import cuda
 import numpy as np
@@ -49,6 +40,10 @@ class Classifier:
 
     def fit(self, data, ratio=0.5):
         self.rules = foldrm(data, ratio=ratio, heuristic=gain)
+
+    def fit_target(self, data, target, ratio=0.5):
+        self.rules = foldr(data, target, ratio=ratio)
+
 
     def fit_no_IG_F1(self, data, ratio=0.5):
         self.rules = foldrm(data, ratio=ratio, heuristic=f1)

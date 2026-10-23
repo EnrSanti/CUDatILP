@@ -76,14 +76,13 @@ def predict(rules, data):
 def f1(tp, fn, tn, fp):
     print("f1")
     if tp == 0:
-        return float("-inf")
+        return -1e20
     # todo questa heuristica mi ritona regole che prendono solo positivi (non rigettano ninete) mancano gli if dell'altra
     # mi ha generato prev_cloud(X,'2') :- month(X,N0), N0=<12.0.    :)
     return 2.0 * tp / (2.0 * tp + fp + fn)
 
 
 def gain(tp, fn, tn, fp):
-    print("gain")
     tp = float(tp)
     fn = float(fn)
     tn = float(tn)
@@ -125,7 +124,7 @@ def gain(tp, fn, tn, fp):
     return math.floor(ret / 1e-8) * 1e-8
 
 
-def best_heuristic(data_pos, data_neg, i, used_items=[], heursitc=gain):
+def best_heuristic(data_pos, data_neg, i, used_items=[], heurisitc=gain):
     xp, xn, cp, cn = 0, 0, 0, 0
     pos, neg = dict(), dict()
     xs, cs = set(), set()
@@ -170,19 +169,19 @@ def best_heuristic(data_pos, data_neg, i, used_items=[], heursitc=gain):
     for x in xs:
         if (i, "<=", x) in used_items or (i, ">", x) in used_items:
             continue
-        ig = heuristic(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
+        ig = heurisitc(pos[x], xp - pos[x] + cp, xn - neg[x] + cn, neg[x])
         if best < ig:
             best, v, r = ig, x, "<="
-        ig = heursitc(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
+        ig = heurisitc(xp - pos[x], pos[x] + cp, neg[x] + cn, xn - neg[x])
         if best < ig:
             best, v, r = ig, x, ">"
     for c in cs:
         if (i, "==", c) in used_items or (i, "!=", c) in used_items:
             continue
-        ig = heuristic(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
+        ig = heurisitc(pos[c], cp - pos[c] + xp, cn - neg[c] + xn, neg[c])
         if best < ig:
             best, v, r = ig, c, "=="
-        ig = heursitc(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
+        ig = heurisitc(cp - pos[c] + xp, pos[c], neg[c], cn - neg[c] + xn)
         if best < ig:
             best, v, r = ig, c, "!="
     return best, r, v
@@ -195,7 +194,7 @@ def best_item(X_pos, X_neg, used_items=[], heuristic=gain):
         return ret
 
     n = len(X_pos[0]) if len(X_pos) > 0 else len(X_neg[0])
-    best = float("-inf")
+    best = -1e20
 
     # print("xpos: "+str(X_pos))
     # print("xneg: "+str(X_neg))
@@ -253,6 +252,24 @@ def foldrm(data, ratio=0.5, heuristic=gain):
         ret.append(rule)
 
     return ret
+
+
+
+def foldr(data, target, ratio=0.5):
+    pos = [d for d in data if d[-1] == target]
+    neg = [d for d in data if d[-1] != target]
+    ret = []
+    while len(pos) > 0:
+        rule = learn_rule(pos, neg, [], ratio)
+        if not rule[1]:
+            break
+        rest = [d for d in pos if not cover(rule, d)]
+        if len(rest) == len(pos):
+            break
+        pos = rest
+        ret.append(((-1, '==', target), rule[1], rule[2], rule[3]))
+    return ret
+
 
 
 def learn_rule(data_pos, data_neg, used_items=[], ratio=0.5, heuristic=gain):
