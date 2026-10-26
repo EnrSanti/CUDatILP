@@ -275,7 +275,7 @@ def best_item_gpu(index_e_plus_dev,index_e_minus_dev,embedded_data_original,inde
         return ret,ret_arr
     
     n = len(embedded_data_original[index_e_plus[0]]) if len(index_e_plus) > 0 else len(embedded_data_original[index_e_minus[0]]) #prende la lunghezza di una riga
-    best = cp.float32(-1e20)
+    best = -1e20
 
     
 
