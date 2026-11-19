@@ -1240,6 +1240,7 @@ const errorPanel  = document.getElementById("errorPanel");
 const errorBody   = document.getElementById("errorBody");
 
 let currentHypothesis = "";
+let currentBackground = "";
 
 function setStatus(msg, kind){
   statusLine.textContent = msg;
@@ -1346,6 +1347,7 @@ learnBtn.addEventListener("click", async () => {
 
     const data = await res.json();
     if (data.error){ showError(data.error); }
+    currentBackground = data.background || "";
     renderHypothesis(data.hypothesis || "");
     setStatus(`done — ${data.meta || "hypothesis derived"}`, "ok");
 
@@ -1387,6 +1389,7 @@ summariseBtn.addEventListener("click", async () => {
         hypothesis:   currentHypothesis,
         description:  problemDesc.value.trim(),
         ollama_model: ollamaModel.value.trim() || "cudatilp",
+        background:   currentBackground,
       }),
     });
 

@@ -91,13 +91,22 @@ class Classifier:
     def set_translator(self, translator):
         self.translator = translator
 
-    def summary(self, description="", simple=True):
+    # def summary(self, description="", simple=True):
+    #     if self.translator is None:
+    #         raise RuntimeError("No translator set. Call set_translator() first!")
+    #     rules = self.asp(simple=simple)
+    #     background = ""
+    #     if self.bg_raw is not None:
+    #         background = self.bg_raw
+    #     return self.translator.summarize(rules, background, description)
+
+    def summary(self, description="", simple=True, hypothesis=None, background=None):
         if self.translator is None:
             raise RuntimeError("No translator set. Call set_translator() first!")
-        rules = self.asp(simple=simple)
-        background = ""
-        if self.bg_raw is not None:
-            background = self.bg_raw
+        # use the provided hypothesis text if given, else the learned rules
+        rules = hypothesis if hypothesis is not None else self.asp(simple=simple)
+        if background is None:
+            background = self.bg_raw if self.bg_raw is not None else ""
         return self.translator.summarize(rules, background, description)
 
 

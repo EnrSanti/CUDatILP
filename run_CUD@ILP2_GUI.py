@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.common.foldrm import *
 from src.common.datasets import *
+from src.common.llm import OllamaTranslator
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Flask serves static files from the same directory as server.py
@@ -110,6 +111,7 @@ def api_summarise():
         hypothesis   = body.get("hypothesis", "").strip()
         description  = body.get("description", "")
         ollama_model = body.get("ollama_model", "cudatilp")
+        background   = body.get("background", "")
  
         if not hypothesis:
             return jsonify({"error": "hypothesis is required"}), 400
@@ -129,10 +131,8 @@ def api_summarise():
             # build a minimal throwaway Classifier so summary() works
             tmp_model = Classifier(attrs=[], numeric=[], label="")
             tmp_model.set_translator(translator)
-            summary = tmp_model.summary(
-                hypothesis=hypothesis,
-                description=description,
-            )
+            summary = tmp_model.summary(description=description, hypothesis=hypothesis, background=background)
+            #summary = translator.summarize(hypothesis, "", description)
         except Exception as e:
             return jsonify({
                 "error": (
@@ -268,6 +268,7 @@ def api_learn():
 
         return jsonify({
             "hypothesis": hypothesis_text,
+            "background": model.bg_raw or "",
             "meta": (
                 f"acc {round(acc_py, 4)} · "
                 f"{n_rules_py} rule{'s' if n_rules_py != 1 else ''} · "
