@@ -6,3 +6,7 @@ __pycache__/
 *.py[cod]
 old/
 .DS_Store
+
+#Ignore R data
+.Rdata
+.Rhistory
